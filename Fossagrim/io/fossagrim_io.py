@@ -1,9 +1,34 @@
 import pandas as pd
 import numpy as np
 import os
+import unittest
 
-from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, heureka_standdata_keys, \
-    heureka_standdata_desc, fossagrim_standdata_keys, translate_keys_from_fossagrim_to_heureka
+from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, \
+    heureka_standdata_keys, heureka_standdata_desc, \
+    heureka_treatment_keys, heureka_treatment_desc, \
+    fossagrim_standdata_keys, \
+    translate_keys_from_fossagrim_to_heureka
+
+
+def get_row_index(table, key, item):
+    """
+    Returns the row index of the item
+    :param table:
+        panda DataFrame
+    :param key:
+        str
+        Name of key we are searching within
+    :param item:
+        str
+        The name we are looking for
+
+    :return:
+    """
+    for i, var in enumerate(table[key]):
+        if item in var:
+            return i
+
+    return None
 
 
 def read_excel(filename, header, sheet_name):
@@ -13,6 +38,115 @@ def read_excel(filename, header, sheet_name):
         print(err_msg)
         return None
     return table
+
+
+def write_csv_file(write_to_file, default_keys, default_desc, append=False, **kwargs):
+    """
+    Writes the parameter values from the kwargs to the 'write_to_file'.
+    It writes to a semicolon separated data file whose first line contains a description, and second
+    line the key names, then each line is a line of data
+
+    Example output is the StandData.csv files that is used by Heureka for import of stand
+    data
+
+    :param write_to_file:
+        Name of csv file to write data to
+    :param default_keys:
+        list
+        List of key names that the csv file must include, eg. heureka_standdata_keys
+    :param default_desc:
+        list
+        List of descriptions that the csv file can include, eg. heureka_standdata_desc
+    :param append:
+        bool
+        if True, the data in kwargs are appended to an existing output file without creating a header
+    :param kwargs:
+        list of keyword arguments.
+        keywords must match the list 'heureka_standdata_keys' given in utils.definitions.py
+        The value of each key is used when writing the 'write_to_file' file
+    :return:
+    """
+    if len(default_keys) != len(default_desc):
+        raise IOError('The lists of keys and descriptions must be of same length')
+
+    # overwrite any existing file, and create the header.
+    if not append:
+        with open(write_to_file, 'w') as f:
+            f.write(';'.join(default_desc)+'\n')
+            f.write(';'.join(default_keys)+'\n')
+
+    # arrange the data from kwargs
+    data = ['']*len(default_keys)
+    for key in kwargs:
+        if key not in default_keys:
+            print('WARNING: key "{}" not found in accepted default keys'.format(key))
+            continue
+        this_data = kwargs[key]
+        if isinstance(this_data, float):
+            this_string = '{:.2f}'.format(this_data)
+        else:
+            this_string = str(this_data)
+        data[default_keys.index(key)] = this_string
+
+    # append the data
+    if len(kwargs) > 0:  # only write data if given
+        with open(write_to_file, 'a') as f:
+            f.write(';'.join(data)+'\n')
+
+
+def read_raw_heureka_results(filename, sheet_name):
+    """
+    Read heureka results as exported from Heureka (by simply copying a simulation result and pasting it
+    into an empty sheet in Excel) and returns the data in a transposed DataFrame with one line for each period (5 years)
+    NOTE, the Variable Treatments:Year must be included in the raw results
+
+    :param filename:
+    :param sheet_name:
+    :return:
+        panda DataFrame
+
+    """
+    table = read_excel(filename, 0, sheet_name)
+    # Some treatments in Heureka break the default periods of 5 years into smaller sub-periods, we choose to remove
+    # these from the returned dataframe
+    year_row = get_row_index(table, 'Variable', 'Year')
+    five_years = [np.mod(this_year, 5) == 0 for this_year in table.iloc[year_row, 3:]]
+    # print(table.iloc[year_row, 3:][five_years])
+    data_dict = {}
+    for variable in list(table['Variable']):
+        row_i = get_row_index(table, 'Variable', variable)
+        data_dict[variable] = table.iloc[row_i, 3:][five_years]
+
+    return pd.DataFrame(data=data_dict)
+
+
+def rearrange_raw_heureka_results(filename, sheet_names):
+    """
+
+    :param filename:
+    :param sheet_names:
+        list
+        List of strings with names of sheets that contains raw results from different Heureka simulations
+    :return:
+    """
+    from openpyxl import load_workbook
+
+    result_sheet_name = 'Rearranged results'
+
+    this_start_col = 0
+    start_cols = []
+    for sheet_name in sheet_names:
+        table = read_raw_heureka_results(filename, sheet_name)
+        with pd.ExcelWriter(filename, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
+            table.to_excel(writer, sheet_name=result_sheet_name, startcol=this_start_col, startrow=2)
+        start_cols.append(this_start_col)
+        this_start_col = len(list(table.keys())) + 2
+
+    wb = load_workbook(filename)
+    ws = wb[result_sheet_name]
+    for i, header in enumerate(sheet_names):
+        ws.cell(1, start_cols[i] + 1).value = header
+    wb.save(filename)
 
 
 def load_heureka_results(filename, header, sheet_name=None, year_key=None, data_key=None):
@@ -69,7 +203,7 @@ def arrange_export_of_one_stand(row_index, table):
         Each row contains one stand
     :return:
         dict
-        Dictionary of keyword: value pairs that can be used by 'write_heureka_standdata'
+        Dictionary of keyword: value pairs that can be used by 'write_csv_file'
     """
     key_translation = translate_keys_from_fossagrim_to_heureka()
     keyword_arguments = {}
@@ -96,6 +230,10 @@ def arrange_export_of_one_stand(row_index, table):
                 raise NotImplementedError('Species "{}" is not recognized as either Gran or Furu'.format(value))
         if key == 'V':
             keyword_arguments[key] = value * 10.  # m3/daa to m3/ha
+        if key == 'N':
+            keyword_arguments[key] = value * 10.  # trees/mål to trees/ha
+        if key == 'PlantDensity':
+            keyword_arguments[key] = value * 10.  # plants/daa to plants/ha
         if key == 'PropPine':
             keyword_arguments[key] = table['Furu'][row_index] / table['Total'][row_index]
         if key == 'PropSpruce':
@@ -146,7 +284,7 @@ def average_over_stands(average_over, table, stand_id_key, average_name):
     # continue using the above indexes to calculate the average values
     total_area = np.sum(table['Prod.areal'][average_ind])
     for key in fossagrim_standdata_keys:
-        if key == 'Fossagrim ID':
+        if key in ['Fossagrim ID', 'Bestand']:
             avg_table[key] = [average_name]
         elif key in keys_to_sum_over:
             avg_table[key] = np.sum(table[key][average_ind])
@@ -171,6 +309,8 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
                                       header=None, sheet_name=None):
     """
     Load a 'typical' Fossagrim stand data file (Bestandsutvalg) and writes an output file which Heureka can use
+    See https://www.heurekaslu.se/wiki/Import_of_stand_register for description of parameters used by Heureka
+
 
     :param read_from_file:
     :param write_to_file:
@@ -199,83 +339,151 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
         return None
 
     append = False
+    note = ''
 
     if (average_over is not None) and isinstance(average_over, list):  # export averaged stands
-        average_table = average_over_stands(average_over, table, stand_id_key, 'Avg stand')
+        this_stand_only = 'Avg stand'
+        table = average_over_stands(average_over, table, stand_id_key, this_stand_only)
+        note = 'Area weighted average of stand {}'.format(', '.join([str(_x) for _x in average_over]))
+
+    for i, stand_id in enumerate(table[stand_id_key]):
+        if (table['Bonitering\ntreslag'][i] == 'Uproduktiv') or np.isnan(table['HovedNr'][i]):
+            continue
+        if (this_stand_only is not None) and (this_stand_only != stand_id):
+            continue
         # get the data from the fossagrim table arranged for writing in heureka format
-        keyword_arguments = arrange_export_of_one_stand(0, average_table)
-        write_heureka_standdata(
+        keyword_arguments = arrange_export_of_one_stand(i, table)
+        write_csv_file(
             write_to_file,
+            heureka_standdata_keys,
+            heureka_standdata_desc,
             append=append,
-            Note='Area weighted average of stand {}'.format(', '.join([str(_x) for _x in average_over])),
+            Note=note,
             **keyword_arguments
         )
-
-    else:  # Only export individual stands
-        for i, stand_id in enumerate(table[stand_id_key]):
-            if (table['Bonitering\ntreslag'][i] == 'Uproduktiv') or np.isnan(table['HovedNr'][i]):
-                continue
-            if (this_stand_only is not None) and (this_stand_only != stand_id):
-                continue
-            # get the data from the fossagrim table arranged for writing in heureka format
-            keyword_arguments = arrange_export_of_one_stand(i, table)
-            write_heureka_standdata(
-                write_to_file,
-                append=append,
-                Note='test',
-                **keyword_arguments
-            )
-            append = True
+        append = True
 
 
-def write_heureka_standdata(write_to_file, append=False, **kwargs):
+def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=None,
+                               average_over=None, stand_id_key=None, header=None, sheet_name=None):
     """
-    Writes the parameter values from the kwargs to the 'write_to_file'
+    Load a 'typical' Fossagrim stand data file (Bestandsutvalg) and writes a 'treatment proposal' output file.
+    This treatment proposal file does not fully follow the Heureka standard for TreatmentProposals but contains Fossagrim
+    specific changes
+    See https://www.heurekaslu.se/wiki/Import_of_stand_register for description of parameters used by Heureka
+    and https://www.heurekaslu.se/help/index.htm?importera_atgardsforslag.htm for treatment proposals
+
+
+    :param read_from_file:
     :param write_to_file:
-        Name of csv file to write data to
-    :param append:
-        bool
-        if True, the data in kwargs are appended to an existing output file without creating a header
-    :param kwargs:
-        list of keyword arguments.
-        keywords must match the list 'heureka_standdata_keys' given in utils.definitions.py
-        The value of each key is used when writing the 'write_to_file' file
+    :param this_stand_only:
+        str
+        Name of stand to export
+    :param average_over:
+        list
+        List of strings which determines which stands to use in calculating an average stand.
+    :param stand_id_key:
+        str
+        Key that is used to identify the stands used in 'average_over'
+    :param header:
+    :param sheet_name:
     :return:
     """
+    if stand_id_key is None:
+        stand_id_key = 'Bestand'
+    if sheet_name is None:
+        sheet_name = 0   # Reads only first sheet, opposite to pandas default were None reads all sheets.
+    if header is None:
+        header = 7
 
-    # overwrite any existing file, and create the header.
-    if not append:
-        with open(write_to_file, 'w') as f:
-            f.write(';'.join(heureka_standdata_desc)+'\n')
-            f.write(';'.join(heureka_standdata_keys)+'\n')
+    table = read_excel(read_from_file, header, sheet_name)
+    if table is None:
+        return None
 
-    # arrange the data from kwargs
-    data = ['']*len(heureka_standdata_keys)
-    for key in kwargs:
-        if key not in heureka_standdata_keys:
-            print('WARNING: key "{}" not found in accepted keys of Heureka stand data files'.format(key))
+    # write to file, but only header lines
+    write_csv_file(
+        write_to_file,
+        heureka_treatment_keys,
+        heureka_treatment_desc,
+        append=False
+    )
+
+    note = ''
+    if (average_over is not None) and isinstance(average_over, list):  # export averaged stands
+        this_stand_only = 'Avg stand'
+        table = average_over_stands(average_over, table, stand_id_key, this_stand_only)
+        note = 'Area weighted average of stand {}'.format(', '.join([str(_x) for _x in average_over]))
+
+    for i, stand_id in enumerate(table[stand_id_key]):
+        if (table['Bonitering\ntreslag'][i] == 'Uproduktiv') or np.isnan(table['HovedNr'][i]):
             continue
-        data[heureka_standdata_keys.index(key)] = str(kwargs[key])
+        if (this_stand_only is not None) and (this_stand_only != stand_id):
+            continue
+        # Write the final felling at year 0 with subsequent planting
+        write_csv_file(
+            write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
+            StandId=table['Fossagrim ID'][i], Year=0, Treatment='FinalFeeling'
+        )
+        write_csv_file(
+            write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
+            StandId=table['Fossagrim ID'][i], Year=2, Treatment='Planting', PlantDensity=table['Plantetetthet'][i] * 10.
+        )
+        # write the thinning
+        write_csv_file(
+            write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
+            StandId=table['Fossagrim ID'][i], Year=table['Tynnings år'][i], Treatment='Thinning'
+        )
+        # And the next final felling with subsequent planting
+        write_csv_file(
+            write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
+            StandId=table['Fossagrim ID'][i], Year=table['Rotasjonsperiode'][i], Treatment='FinalFeeling'
+        )
+        write_csv_file(
+            write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
+            StandId=table['Fossagrim ID'][i], Year=table['Rotasjonsperiode'][i] + 2,
+            Treatment='Planting', PlantDensity=table['Plantetetthet'][i] * 10.
+        )
 
-    # append the data
-    with open(write_to_file, 'a') as f:
-        f.write(';'.join(data)+'\n')
+
+def test_rearrange():
+    file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Heureka results COPY.xlsx"
+    rearrange_raw_heureka_results(file, ['FHF23-003 Business as usual', 'FHF23-003 Preservation'])
 
 
-def test_write_heureka_standdata():
+def test_write_csv_file():
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    write_heureka_standdata(os.path.join(dir_path, 'test.csv'), test=8, DGV=46, SiteIndexSpecies='G')
-    write_heureka_standdata(os.path.join(dir_path, 'test.csv'), append=True, SiteIndexSpecies='T')
+    write_csv_file(os.path.join(dir_path, 'test.csv'),
+                   heureka_standdata_keys,
+                   heureka_standdata_desc,
+                   test=8, DGV=46, SiteIndexSpecies='G')
+    write_csv_file(os.path.join(dir_path, 'test.csv'),
+                   heureka_standdata_keys,
+                   heureka_standdata_desc,
+                   append=True, SiteIndexSpecies='T')
+    write_csv_file(os.path.join(dir_path, 'test2.csv'),
+                   heureka_standdata_keys,
+                   heureka_standdata_desc)
+
+    unittest.TestCase.assertTrue(True)
 
 
 def test_export_fossagrim_stand():
     dir_path = os.path.dirname(os.path.realpath(__file__))
     read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Bestandsutvalg.xlsx"
-    write_to_file = os.path.join(dir_path, 'test.csv')
+    write_to_file = os.path.join(dir_path, 'standdata.csv')
 
     export_fossagrim_stand_to_heureka(read_from_file, write_to_file, average_over=[67, 70],
                                       this_stand_only=67)
 
 
+def test_export_fossagrim_treatment():
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Bestandsutvalg.xlsx"
+    write_to_file = os.path.join(dir_path, 'treatment.csv')
+
+    export_fossagrim_treatment(read_from_file, write_to_file, average_over=[67, 70],
+                               this_stand_only=67)
+
+
 if __name__ == '__main__':
-    test_load_fossagrim_input()
+    test_rearrange()

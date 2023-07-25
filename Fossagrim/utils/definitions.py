@@ -1,4 +1,4 @@
-
+# https://www.heurekaslu.se/wiki/Import_of_stand_register
 heureka_mandatory_standdata_keys = [
 	'StandId',
 	'TotalArea',
@@ -127,6 +127,34 @@ heureka_standdata_desc = [
 	'','','','','','','','','','','','','','','','','','','','',''
 ]
 
+heureka_treatment_keys = [
+	# https://www.heurekaslu.se/wiki/Import_of_stand_register
+	# https://www.heurekaslu.se/help/index.htm?importera_atgardsforslag.htm
+	'AreaLevel2',
+	'AreaLevel3',
+	'StandId',
+	'Treatment',
+	'Year',
+	'Species',
+	'ThinningForm',
+	'ThinningGrade',
+	'PlantDensity',
+	'Note'
+]
+
+heureka_treatment_desc = [
+	'',
+	'',
+	'',
+	'',
+	'',
+	'',
+	'',
+	'',
+	'Plants/ha',
+	'Description'
+]
+
 fossagrim_standdata_keys = [
 	'HovedNr',
 	'Gnr',
@@ -220,6 +248,8 @@ def translate_keys_from_fossagrim_to_heureka():
 			translation['G'] = key
 		if key == 'Svensk bonitet':
 			translation['SIS'] = key
+		if key == 'Plantetetthet':
+			translation['PlantDensity'] = key
 	return translation
 
 
