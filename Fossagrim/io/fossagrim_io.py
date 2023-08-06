@@ -251,8 +251,13 @@ def average_over_stands(average_over, table, stand_id_key, average_name):
     Calculates the area weighted averages
 
     :param average_over:
-        list
-        List of strings which determines which stands to use in calculating an average stand.
+        dict
+        dictionary where each item contains a list of strings/int which determines which stands to use in calculating
+        average stands. The key is the name of each individual average. eg.
+        {
+            'Spruce': [67, 68, 70, 72, 75],
+            'Pine': [32, 56, 58]
+        }
     :param table:
         pandas DataFrame
         Table with data as read in 'export_fossagrim_stand_to_heureka'
@@ -262,10 +267,11 @@ def average_over_stands(average_over, table, stand_id_key, average_name):
         Key that is used to identify the stands used in 'average_over'
     :param average_name:
         str
-        Given name of the calculated average stand
+        Given main name of the calculated average stands. The key is 'average_over' is then added, e.g.
+        '<average_name>-Spruce'
     :return:
         panda DataFrame
-        A copy of the original input table, but with only one line of data, which is the
+        A copy of the original input table, but with one line of data for each average stand, which is the
         area weighted averages over the selected stands
     """
     from Fossagrim.utils.definitions import fossagrim_keys_to_average_over as keys_to_average_over
@@ -275,31 +281,58 @@ def average_over_stands(average_over, table, stand_id_key, average_name):
     # create a new empty DataFrame that should hold the average values
     avg_table = pd.DataFrame(columns=list(table.keys()))
 
-    # extract the row indexes over which the average is calculated
-    average_ind = []
-    for i, stand_id in enumerate(table[stand_id_key]):
-        if stand_id in average_over:
-            average_ind.append(i)
+    for avg_group in average_over:
+        # extract the row indexes over which the average is calculated for this group
+        average_ind = []
+        for i, stand_id in enumerate(table[stand_id_key]):
+            if stand_id in average_over[avg_group]:
+                average_ind.append(i)
 
-    # continue using the above indexes to calculate the average values
-    total_area = np.sum(table['Prod.areal'][average_ind])
-    for key in fossagrim_standdata_keys:
-        if key in ['Fossagrim ID', 'Bestand']:
-            avg_table[key] = [average_name]
-        elif key in keys_to_sum_over:
-            avg_table[key] = np.sum(table[key][average_ind])
-        elif key in keys_to_average_over:
-            avg_table[key] = np.sum(table['Prod.areal'][average_ind] * table[key][average_ind]) / total_area
-        elif key in keys_to_most_of:
-            # An area weighted 'most of' calculation
-            this_data = table[key][average_ind]
-            area_weighted_average = np.sum(this_data * table['Prod.areal'][average_ind]) / total_area
-            # index of original data closest to the average
-            ind = np.argmin((this_data - area_weighted_average)**2)
-            avg_table[key] = this_data[ind]
-        else:
-            # for other parameters, just copy the first selected stand
-            avg_table[key] = [table[key][average_ind[0]]]
+        if len(average_ind) == 0:
+            print('WARNING, no match for average group {}'.format(avg_group))
+            continue
+
+        this_row_of_data = []
+        # continue using the above indexes to calculate the average values
+        total_area = np.sum(table['Prod.areal'][average_ind])
+        # for key in fossagrim_standdata_keys:
+        for key in list(table.keys()):
+            if key in ['Fossagrim ID', 'Bestand']:
+                this_row_of_data.append('{}-{}'.format(average_name, avg_group))
+            elif key in keys_to_sum_over:
+                this_row_of_data.append(np.sum(table[key][average_ind]))
+            elif key in keys_to_average_over:
+                this_row_of_data.append(np.sum(table['Prod.areal'][average_ind] * table[key][average_ind]) / total_area)
+            elif key in keys_to_most_of:
+                # An area weighted 'most of' calculation
+                this_data = table[key][average_ind].array
+                area_weighted_average = np.sum(this_data * table['Prod.areal'][average_ind]) / total_area
+                # index of original data closest to the average
+                ind = np.argmin((this_data - area_weighted_average)**2)
+                this_row_of_data.append(this_data[ind])
+            else:
+                # for other parameters, just copy the first selected stand
+                this_row_of_data.append(table[key][average_ind[0]])
+
+        avg_table.loc[len(avg_table)] = this_row_of_data
+
+        # for key in fossagrim_standdata_keys:
+        #     if key in ['Fossagrim ID', 'Bestand']:
+        #         avg_table[key] = [average_name]
+        #     elif key in keys_to_sum_over:
+        #         avg_table[key] = np.sum(table[key][average_ind])
+        #     elif key in keys_to_average_over:
+        #         avg_table[key] = np.sum(table['Prod.areal'][average_ind] * table[key][average_ind]) / total_area
+        #     elif key in keys_to_most_of:
+        #         # An area weighted 'most of' calculation
+        #         this_data = table[key][average_ind]
+        #         area_weighted_average = np.sum(this_data * table['Prod.areal'][average_ind]) / total_area
+        #         # index of original data closest to the average
+        #         ind = np.argmin((this_data - area_weighted_average)**2)
+        #         avg_table[key] = this_data[ind]
+        #     else:
+        #         # for other parameters, just copy the first selected stand
+        #         avg_table[key] = [table[key][average_ind[0]]]
 
     return avg_table
 
@@ -318,8 +351,13 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
         str
         Name of stand to export
     :param average_over:
-        list
-        List of strings which determines which stands to use in calculating an average stand.
+        dict
+        dictionary where each item contains a list of strings/int which determines which stands to use in calculating
+        average stands. The key is the name of each individual average. eg.
+        {
+            'Spruce': [67, 68, 70, 72, 75],
+            'Pine': [32, 56, 58]
+        }
     :param stand_id_key:
         str
         Key that is used to identify the stands used in 'average_over'
@@ -339,15 +377,16 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
         return None
 
     append = False
-    note = ''
+    notes = [''] * len(table[stand_id_key])
 
-    if (average_over is not None) and isinstance(average_over, list):  # export averaged stands
-        this_stand_only = 'Avg stand'
-        table = average_over_stands(average_over, table, stand_id_key, this_stand_only)
-        note = 'Area weighted average of stand {}'.format(', '.join([str(_x) for _x in average_over]))
+    if (average_over is not None) and isinstance(average_over, dict):  # export averaged stands
+        this_stand_only = None
+        table = average_over_stands(average_over, table, stand_id_key, 'Avg Stand')
+        notes = ['Area weighted average for {} of stands {}'.format(_key, ', '.join([str(_x) for _x in average_over[_key]]))
+                 for _key in list(average_over.keys())]
 
     for i, stand_id in enumerate(table[stand_id_key]):
-        if (table['Bonitering\ntreslag'][i] == 'Uproduktiv') or np.isnan(table['HovedNr'][i]):
+        if (table['Bonitering\ntreslag'][i] in ['Uproduktiv', '-']) or np.isnan(table['HovedNr'][i]):
             continue
         if (this_stand_only is not None) and (this_stand_only != stand_id):
             continue
@@ -358,7 +397,7 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
             heureka_standdata_keys,
             heureka_standdata_desc,
             append=append,
-            Note=note,
+            Note=notes[i],
             **keyword_arguments
         )
         append = True
@@ -380,8 +419,13 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
         str
         Name of stand to export
     :param average_over:
-        list
-        List of strings which determines which stands to use in calculating an average stand.
+        dict
+        dictionary where each item contains a list of strings/int which determines which stands to use in calculating
+        average stands. The key is the name of each individual average. eg.
+        {
+            'Spruce': [67, 68, 70, 72, 75],
+            'Pine': [32, 56, 58]
+        }
     :param stand_id_key:
         str
         Key that is used to identify the stands used in 'average_over'
@@ -408,40 +452,46 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
         append=False
     )
 
-    note = ''
-    if (average_over is not None) and isinstance(average_over, list):  # export averaged stands
-        this_stand_only = 'Avg stand'
-        table = average_over_stands(average_over, table, stand_id_key, this_stand_only)
-        note = 'Area weighted average of stand {}'.format(', '.join([str(_x) for _x in average_over]))
+    notes = [''] * len(table[stand_id_key])
+
+    if (average_over is not None) and isinstance(average_over, dict):  # export averaged stands
+        this_stand_only = None
+        table = average_over_stands(average_over, table, stand_id_key, 'Avg stand')
+        notes = ['Area weighted average for {} of stands {}'.format(_key, ', '.join([str(_x) for _x in average_over[_key]]))
+                 for _key in list(average_over.keys())]
 
     for i, stand_id in enumerate(table[stand_id_key]):
-        if (table['Bonitering\ntreslag'][i] == 'Uproduktiv') or np.isnan(table['HovedNr'][i]):
+        if (table['Bonitering\ntreslag'][i] in ['Uproduktiv', '-']) or np.isnan(table['HovedNr'][i]):
             continue
         if (this_stand_only is not None) and (this_stand_only != stand_id):
             continue
         # Write the final felling at year 0 with subsequent planting
         write_csv_file(
             write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
-            StandId=table['Fossagrim ID'][i], Year=0, Treatment='FinalFeeling'
+            StandId=table['Fossagrim ID'][i], Year=0,
+            Treatment='FinalFeeling', Note=notes[i]
         )
         write_csv_file(
             write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
-            StandId=table['Fossagrim ID'][i], Year=2, Treatment='Planting', PlantDensity=table['Plantetetthet'][i] * 10.
+            StandId=table['Fossagrim ID'][i], Year=2,
+            Treatment='Planting', PlantDensity=table['Plantetetthet'][i] * 10., Note=notes[i]
         )
         # write the thinning
         write_csv_file(
             write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
-            StandId=table['Fossagrim ID'][i], Year=table['Tynnings år'][i], Treatment='Thinning'
+            StandId=table['Fossagrim ID'][i], Year=table['Tynnings år'][i],
+            Treatment='Thinning', Note=notes[i]
         )
         # And the next final felling with subsequent planting
         write_csv_file(
             write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
-            StandId=table['Fossagrim ID'][i], Year=table['Rotasjonsperiode'][i], Treatment='FinalFeeling'
+            StandId=table['Fossagrim ID'][i], Year=table['Rotasjonsperiode'][i],
+            Treatment='FinalFeeling', Note=notes[i]
         )
         write_csv_file(
             write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
             StandId=table['Fossagrim ID'][i], Year=table['Rotasjonsperiode'][i] + 2,
-            Treatment='Planting', PlantDensity=table['Plantetetthet'][i] * 10.
+            Treatment='Planting', PlantDensity=table['Plantetetthet'][i] * 10., Note=notes[i]
         )
 
 
@@ -469,21 +519,39 @@ def test_write_csv_file():
 
 def test_export_fossagrim_stand():
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Bestandsutvalg.xlsx"
+    # read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Bestandsutvalg.xlsx"
+    read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-005 Kvistaul\\FHF23-005 Bestandsutvalg.xlsx"
     write_to_file = os.path.join(dir_path, 'standdata.csv')
 
-    export_fossagrim_stand_to_heureka(read_from_file, write_to_file, average_over=[67, 70],
-                                      this_stand_only=67)
+    export_fossagrim_stand_to_heureka(read_from_file, write_to_file,
+                                      stand_id_key='Fossagrim ID',
+                                      average_over={
+                                          'Spruce': ['FHF23-005-2', 'FHF23-005-13'],
+                                          'Pine': ['FHF23-005-26', 'FHF23-005-27']
+                                      }
+                                      )
+    # export_fossagrim_stand_to_heureka(read_from_file, write_to_file, average_over={'Spruce': [67, 70]},
+    #                                   this_stand_only=67)
 
 
 def test_export_fossagrim_treatment():
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Bestandsutvalg.xlsx"
+    # read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Bestandsutvalg.xlsx"
+    read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-005 Kvistaul\\FHF23-005 Bestandsutvalg.xlsx"
     write_to_file = os.path.join(dir_path, 'treatment.csv')
 
-    export_fossagrim_treatment(read_from_file, write_to_file, average_over=[67, 70],
-                               this_stand_only=67)
+    export_fossagrim_treatment(read_from_file, write_to_file,
+                               stand_id_key='Fossagrim ID',
+                               average_over={
+                                   'Spruce': ['FHF23-005-2', 'FHF23-005-13'],
+                                   'Pine': ['FHF23-005-26', 'FHF23-005-27']
+                               }
+                               )
+    # export_fossagrim_treatment(read_from_file, write_to_file, average_over={'Spruce': [67, 70]},
+    #                            this_stand_only=67)
 
 
 if __name__ == '__main__':
-    test_rearrange()
+    # test_rearrange()
+    # test_export_fossagrim_stand()
+    test_export_fossagrim_treatment()
