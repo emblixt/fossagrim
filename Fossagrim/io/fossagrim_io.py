@@ -133,14 +133,13 @@ def rearrange_raw_heureka_results(filename, sheet_names):
 
     result_sheet_name = 'Rearranged results'
 
-    this_start_col = 0
     start_cols = []
-    for sheet_name in sheet_names:
+    for i, sheet_name in enumerate(sheet_names):
         table = read_raw_heureka_results(filename, sheet_name)
+        this_start_col = i * (len(list(table.keys())) + 2)
         with pd.ExcelWriter(filename, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
             table.to_excel(writer, sheet_name=result_sheet_name, startcol=this_start_col, startrow=2)
         start_cols.append(this_start_col)
-        this_start_col = len(list(table.keys())) + 2
 
     wb = load_workbook(filename)
     ws = wb[result_sheet_name]
@@ -267,7 +266,7 @@ def average_over_stands(average_over, table, stand_id_key, average_name):
         Key that is used to identify the stands used in 'average_over'
     :param average_name:
         str
-        Given main name of the calculated average stands. The key is 'average_over' is then added, e.g.
+        Given main name of the calculated average stands. The key in 'average_over' is then added, e.g.
         '<average_name>-Spruce'
     :return:
         panda DataFrame
@@ -339,7 +338,7 @@ def average_over_stands(average_over, table, stand_id_key, average_name):
 
 def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_only=None, average_over=None,
                                       stand_id_key=None,
-                                      header=None, sheet_name=None):
+                                      header=None, sheet_name=None, average_name=None):
     """
     Load a 'typical' Fossagrim stand data file (Bestandsutvalg) and writes an output file which Heureka can use
     See https://www.heurekaslu.se/wiki/Import_of_stand_register for description of parameters used by Heureka
@@ -381,7 +380,7 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
 
     if (average_over is not None) and isinstance(average_over, dict):  # export averaged stands
         this_stand_only = None
-        table = average_over_stands(average_over, table, stand_id_key, 'Avg Stand')
+        table = average_over_stands(average_over, table, stand_id_key, average_name)
         notes = ['Area weighted average for {} of stands {}'.format(_key, ', '.join([str(_x) for _x in average_over[_key]]))
                  for _key in list(average_over.keys())]
 
@@ -404,7 +403,7 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
 
 
 def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=None,
-                               average_over=None, stand_id_key=None, header=None, sheet_name=None):
+                               average_over=None, stand_id_key=None, header=None, sheet_name=None, average_name=None):
     """
     Load a 'typical' Fossagrim stand data file (Bestandsutvalg) and writes a 'treatment proposal' output file.
     This treatment proposal file does not fully follow the Heureka standard for TreatmentProposals but contains Fossagrim
@@ -439,6 +438,8 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
         sheet_name = 0   # Reads only first sheet, opposite to pandas default were None reads all sheets.
     if header is None:
         header = 7
+    if average_name is None:
+        average_name = 'Avg Stand'
 
     table = read_excel(read_from_file, header, sheet_name)
     if table is None:
@@ -456,7 +457,7 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
 
     if (average_over is not None) and isinstance(average_over, dict):  # export averaged stands
         this_stand_only = None
-        table = average_over_stands(average_over, table, stand_id_key, 'Avg stand')
+        table = average_over_stands(average_over, table, stand_id_key, average_name)
         notes = ['Area weighted average for {} of stands {}'.format(_key, ', '.join([str(_x) for _x in average_over[_key]]))
                  for _key in list(average_over.keys())]
 
