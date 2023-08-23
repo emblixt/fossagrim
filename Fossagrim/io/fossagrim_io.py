@@ -225,6 +225,8 @@ def arrange_export_of_one_stand(row_index, table):
                 keyword_arguments[key] = 'G'
             elif value == 'Furu':
                 keyword_arguments[key] = 'T'
+            elif value == 'Bjørk':
+                keyword_arguments[key] = 'B'
             else:
                 raise NotImplementedError('Species "{}" is not recognized as either Gran or Furu'.format(value))
         if key == 'V':
@@ -245,7 +247,7 @@ def arrange_export_of_one_stand(row_index, table):
     return keyword_arguments
 
 
-def average_over_stands(average_over, table, stand_id_key, average_name):
+def average_over_stands(average_over, table, stand_id_key, average_name, verbose=False):
     """
     Calculates the area weighted averages
 
@@ -281,6 +283,8 @@ def average_over_stands(average_over, table, stand_id_key, average_name):
     avg_table = pd.DataFrame(columns=list(table.keys()))
 
     for avg_group in average_over:
+        if verbose:
+            print('Averaging group {}, which contains stands {}'.format(avg_group, average_over[avg_group]))
         # extract the row indexes over which the average is calculated for this group
         average_ind = []
         for i, stand_id in enumerate(table[stand_id_key]):
@@ -297,21 +301,35 @@ def average_over_stands(average_over, table, stand_id_key, average_name):
         # for key in fossagrim_standdata_keys:
         for key in list(table.keys()):
             if key in ['Fossagrim ID', 'Bestand']:
-                this_row_of_data.append('{}-{}'.format(average_name, avg_group))
+                this_data = '{}-{}'.format(average_name, avg_group)
+                if verbose:
+                    print(' {}: {}'.format(key, this_data))
+                this_row_of_data.append(this_data)
             elif key in keys_to_sum_over:
-                this_row_of_data.append(np.sum(table[key][average_ind]))
+                this_data = np.sum(table[key][average_ind])
+                if verbose:
+                    print(' {}: {}'.format(key, this_data))
+                this_row_of_data.append(this_data)
             elif key in keys_to_average_over:
-                this_row_of_data.append(np.sum(table['Prod.areal'][average_ind] * table[key][average_ind]) / total_area)
+                this_data = np.sum(table['Prod.areal'][average_ind] * table[key][average_ind]) / total_area
+                if verbose:
+                    print(' {}: {}'.format(key, this_data))
+                this_row_of_data.append(this_data)
             elif key in keys_to_most_of:
                 # An area weighted 'most of' calculation
                 this_data = table[key][average_ind].array
                 area_weighted_average = np.sum(this_data * table['Prod.areal'][average_ind]) / total_area
                 # index of original data closest to the average
                 ind = np.argmin((this_data - area_weighted_average)**2)
+                if verbose:
+                    print(' {}: {}'.format(key, this_data[ind]))
                 this_row_of_data.append(this_data[ind])
             else:
                 # for other parameters, just copy the first selected stand
-                this_row_of_data.append(table[key][average_ind[0]])
+                this_data = table[key][average_ind[0]]
+                if verbose:
+                    print(' {}: {}'.format(key, this_data))
+                this_row_of_data.append(this_data)
 
         avg_table.loc[len(avg_table)] = this_row_of_data
 
@@ -338,7 +356,7 @@ def average_over_stands(average_over, table, stand_id_key, average_name):
 
 def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_only=None, average_over=None,
                                       stand_id_key=None,
-                                      header=None, sheet_name=None, average_name=None):
+                                      header=None, sheet_name=None, average_name=None, verbose=False):
     """
     Load a 'typical' Fossagrim stand data file (Bestandsutvalg) and writes an output file which Heureka can use
     See https://www.heurekaslu.se/wiki/Import_of_stand_register for description of parameters used by Heureka
@@ -373,6 +391,7 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
 
     table = read_excel(read_from_file, header, sheet_name)
     if table is None:
+        print('WARNING, stands could not be loaded from {}'.format(read_from_file))
         return None
 
     append = False
@@ -380,15 +399,22 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
 
     if (average_over is not None) and isinstance(average_over, dict):  # export averaged stands
         this_stand_only = None
-        table = average_over_stands(average_over, table, stand_id_key, average_name)
+        table = average_over_stands(average_over, table, stand_id_key, average_name, verbose=verbose)
         notes = ['Area weighted average for {} of stands {}'.format(_key, ', '.join([str(_x) for _x in average_over[_key]]))
                  for _key in list(average_over.keys())]
 
+    number_of_stands_written = 0
     for i, stand_id in enumerate(table[stand_id_key]):
         if (table['Bonitering\ntreslag'][i] in ['Uproduktiv', '-']) or np.isnan(table['HovedNr'][i]):
+            if verbose:
+                print('Skipping stand {}'.format(stand_id))
             continue
         if (this_stand_only is not None) and (this_stand_only != stand_id):
+            if verbose:
+                print('Skipping stand {}'.format(stand_id))
             continue
+        if verbose:
+            print('Attempting to write {} to {}'.format(stand_id, write_to_file))
         # get the data from the fossagrim table arranged for writing in heureka format
         keyword_arguments = arrange_export_of_one_stand(i, table)
         write_csv_file(
@@ -399,7 +425,11 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
             Note=notes[i],
             **keyword_arguments
         )
+        number_of_stands_written += 1
         append = True
+
+    if number_of_stands_written == 0:
+        print('WARNING: No stands written to {}'.format(write_to_file))
 
 
 def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=None,
@@ -514,8 +544,6 @@ def test_write_csv_file():
     write_csv_file(os.path.join(dir_path, 'test2.csv'),
                    heureka_standdata_keys,
                    heureka_standdata_desc)
-
-    unittest.TestCase.assertTrue(True)
 
 
 def test_export_fossagrim_stand():
