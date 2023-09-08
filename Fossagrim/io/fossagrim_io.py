@@ -120,13 +120,21 @@ def read_raw_heureka_results(filename, sheet_name):
     return pd.DataFrame(data=data_dict)
 
 
-def rearrange_raw_heureka_results(filename, sheet_names):
+def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets):
     """
 
     :param filename:
     :param sheet_names:
         list
         List of strings with names of sheets that contains raw results from different Heureka simulations
+    :param combine_sheets:
+        dict
+        { <NAME OF COMBINED RESULTS>: [<SHEET NAME FOR FOREST TYPE 1 IN HEUREKA RAW RESULTS>, <FRACTION TYPE 1>,
+                                       <SHEET NAME FOR FOREST TYPE 2 IN HEUREKA RAW RESULTS>, <FRACTION TYPE 2>,
+                                       ... ],
+         <ANOTHER COMBINED RESULT>: [<SHEET NAME FOR FOREST TYPE 1 IN HEUREKA RAW RESULTS>, <FRACTION TYPE 1>,
+                                     <SHEET NAME FOR FOREST TYPE 2 IN HEUREKA RAW RESULTS>, <FRACTION TYPE 2>,
+                                     ... ]}
     :return:
     """
     from openpyxl import load_workbook
@@ -146,6 +154,41 @@ def rearrange_raw_heureka_results(filename, sheet_names):
     for i, header in enumerate(sheet_names):
         ws.cell(1, start_cols[i] + 1).value = header
     wb.save(filename)
+
+    if combine_sheets is not None:
+        last_start_col = start_cols[-1]
+        # All the tables to be combined need to have the same (name and numbers) of columns
+        for i, this_combined_result in enumerate(list(combine_sheets.keys())):
+            fractions = []
+            tables = []
+            for j, sheet_name in enumerate(combine_sheets[this_combined_result]):
+                if np.mod(j, 2) != 0:
+                    # sheet names are found in positions 0, 2, 4, ... in the list
+                    # On position 1, 3, 5, ... the fractions are stored
+                    fractions.append(sheet_name)
+                    continue
+                tables.append(read_raw_heureka_results(filename, sheet_name))
+            combined_dict = {}
+            for key in list(tables[0].keys()):
+                if key == 'Treatment':
+                    combined_dict[key] = tables[0][key].values
+                    continue
+                this_column = np.zeros(len(tables[0][key]))
+                for k in range(len(tables)):
+                    # Combine the tables using the fractions
+                    this_column = this_column + tables[k][key].values * fractions[k]
+                combined_dict[key] = this_column
+            combined_table = pd.DataFrame(data=combined_dict)
+
+            # Start writing the combined table
+            this_start_col = last_start_col + (i + 1) * (len(list(combined_table.keys())) + 2)
+            with pd.ExcelWriter(filename, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
+                combined_table.to_excel(writer, sheet_name=result_sheet_name, startcol=this_start_col, startrow=2)
+
+            wb = load_workbook(filename)
+            ws = wb[result_sheet_name]
+            ws.cell(1, this_start_col + 1).value = this_combined_result
+            wb.save(filename)
 
 
 def load_heureka_results(filename, header, sheet_name=None, year_key=None, data_key=None):
