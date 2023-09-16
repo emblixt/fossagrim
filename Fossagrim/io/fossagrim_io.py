@@ -569,6 +569,32 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
         )
 
 
+def test_write_excel_with_equations():
+    from openpyxl import load_workbook
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    efile = os.path.join(dir_path, 'test.xlsx')
+    sheet_names = ['One', 'Two', 'Three']
+
+    writer = pd.ExcelWriter(efile, engine='xlsxwriter')
+    wb = writer.book
+    for sheet in sheet_names:
+        ws = wb.add_worksheet(sheet)
+    writer.close()
+
+    wb = load_workbook(efile)
+    ws = wb['Three']
+    ws.cell(1, 1).value = 'Constant'
+    ws.cell(1, 2).value = 4
+
+    ws = wb['Two']
+    ws.cell(1, 1).value = '=One!A1*One!B1'
+    ws.cell(1, 2).value = '=One!A1*Three!$B$1'
+    for i in range(4):
+        ws.cell(i+2, 1).value = '=One!A{}*One!B{}'.format(i+2, i+2)
+        ws.cell(i + 2, 2).value = '=One!A{}*Three!$B$1'.format(i + 2)
+    wb.save(efile)
+
+
 def test_rearrange():
     file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Heureka results COPY.xlsx"
     rearrange_raw_heureka_results(file, ['FHF23-003 Business as usual', 'FHF23-003 Preservation'])
@@ -626,4 +652,5 @@ def test_export_fossagrim_treatment():
 if __name__ == '__main__':
     # test_rearrange()
     # test_export_fossagrim_stand()
-    test_export_fossagrim_treatment()
+    # test_export_fossagrim_treatment()
+    test_write_excel_with_equations()
