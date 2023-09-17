@@ -1,4 +1,7 @@
 # https://www.heurekaslu.se/wiki/Import_of_stand_register
+import pandas as pd
+import datetime
+
 heureka_mandatory_standdata_keys = [
 	'StandId',
 	'TotalArea',
@@ -224,7 +227,28 @@ fossagrim_keys_to_most_of = [
 	'Peat'
 ]
 
+monetization_parameters = pd.DataFrame([
+	['hpap', 2, 'Half time for paper [yrs]'],
+	['hsawn', 35, 'Half time for sawn products [yrs]'],
+	['SFsawn', 0.58, 'Substitutionsfaktor  för långlivade produkter, excl end-of-life energiåtervinning'],
+	['SFpp', '=0.87*B4', 'Substitutionsfaktor för massa och papper'],
+	['SFfuel', '=0.4*B4', 'Substitutionsfaktor för biomassa som avänds som bränsle '],
+	['p', 0.233, 'Andelen av skördat timmer som blir sågade produkter'],
+	['pp', 0.301, 'Andelen av skördad massaved som blir papper'],
+	['pf', 0.159, 'Proportion av skörden som går direkt till energiproduktion'],
+	['psfuel', 0.8, 'Proportion av förluster från poolen sågade trävaror som ger end of life subst'],
+	['k', 0.21, 'Omvandlingsfaktor m3sk till ton C']
+])
 
+monetization_calculation_part1 = pd.DataFrame([
+	['Sheet updated', datetime.date.today().isoformat(), '', 'Productive, active area, ha', '', 0.0, '', 'Base case pools, ton CO2', '', '', '', '', '', '', '', 'Project case pools, ton CO2', '', 'Climate benefit, ton CO2', '', '', '', '', ''],
+	['By', 'Python script', '', 'Measure, Carbon or CO2?', '', 'CO2', '=IF(F2="C";1;44/12)', 'Unit area: 1 ha', '', '', '', '=CONCATENATE("Active area: ";$F$1;" ha")', '', '', '', '=H2', 'Active area', '=H2', '', '', '=CONCATENATE("Active area: ";$F$1;" ha")', '', ''],
+	['del t', 'year 0', 'Total extracted', 'Total extracted', 'Total extrated to sawn prod', 'Prod pool change', 'Substitution', '=CONCATENATE("Ton ";$F$2;"/ha")', '', '', '', '=CONCATENATE("Total ton ";$F$2;"/ha")', '', '', '', '=CONCATENATE("Ton ";$F$2;"/ha")', '=CONCATENATE("Total ton ";$F$2)', '=CONCATENATE("Ton ";$F$2;"/ha")', '=CONCATENATE("Ton ";$F$2;"/ha/";A5;"yr")', '=CONCATENATE("Ton ";$F$2;"/ha/yr")', '=CONCATENATE("Ton ";$F$2)', '=CONCATENATE("Ton ";$F$2;"/";A5;"yr")', '=CONCATENATE("Ton ";$F$2;"/yr")'],
+	[5, 2024, 'vol fub m3/ha', 'C ton/ha', 'C ton/ha', 'C ton/ha/ 5yr', 'C ton/ha', 'Forest', 'Product', 'Substitution', 'Base case', 'Forest', 'Product', 'Substitution', 'Base case', 'Project', 'Project', 'Accumulated', 'Interval', 'Yearly', 'Accumulated', 'Interval', 'Yearly'],
+	['t', 'year', 'COPY OVER!', '', '', '', '', 'COPY OVER!', '', '', '', '', '', '', '', 'COPY OVER!', '', '', '', '', '', '', ''],
+	['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+	[0, '=B$5+A8', '="Rearranged results"!AY4*$G$2', '=C8*k', '=D8*p', '=IF(H8>0;I8-I7;)', '=D8*(p*SFsawn+pp*SFpp+pf*SFfuel)+(E8-F8)*psfuel*SFfuel', '="Rearranged results"!AX4*$G$2', '=IF(H8>0;E8+I7*0,5^(5/hsawn);)', '=IF(H8>0;SUM($G$8:G8);)', '=IF(H8>0;H8+I7+J7;)', '=H8*$F$1', '=I8*$F$1', '=J8*$F$1', '=K8*$F$1', '="Rearranged results"!BI4*$G$2', '=P8*$F$1', '=P8-K8', '=IF(H8>0;R8-R7;)', '=S8/$A$5', '=Q8-O8', '=IF(H8>0;U8-U7;)', '=V8/$A$5']
+])
 def translate_keys_from_fossagrim_to_heureka():
 	translation = {}
 	for key in fossagrim_standdata_keys:

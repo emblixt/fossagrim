@@ -7,7 +7,8 @@ from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, \
     heureka_standdata_keys, heureka_standdata_desc, \
     heureka_treatment_keys, heureka_treatment_desc, \
     fossagrim_standdata_keys, \
-    translate_keys_from_fossagrim_to_heureka
+    translate_keys_from_fossagrim_to_heureka,\
+    monetization_parameters
 
 
 def get_row_index(table, key, item):
@@ -120,7 +121,7 @@ def read_raw_heureka_results(filename, sheet_name):
     return pd.DataFrame(data=data_dict)
 
 
-def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets):
+def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetization_file=None):
     """
 
     :param filename:
@@ -135,11 +136,28 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets):
          <ANOTHER COMBINED RESULT>: [<SHEET NAME FOR FOREST TYPE 1 IN HEUREKA RAW RESULTS>, <FRACTION TYPE 1>,
                                      <SHEET NAME FOR FOREST TYPE 2 IN HEUREKA RAW RESULTS>, <FRACTION TYPE 2>,
                                      ... ]}
+    :param monetization_file:
+        str
+        Full path name of monetization file which we try to generate if not existing
+
     :return:
     """
     from openpyxl import load_workbook
 
     result_sheet_name = 'Rearranged results'
+    write_monetization_file = False
+    if monetization_file is not None:
+        if os.path.isfile(monetization_file):
+            print("WARNING monetization file {} already exists. No empty file created".format(
+                os.path.split(monetization_file)[-1]))
+        else:
+            # Create empty monetization file
+            writer = pd.ExcelWriter(monetization_file, engine='xlsxwriter')
+            wb = writer.book
+            for _sheet in [result_sheet_name, 'Parameters', 'Monetization']:
+                ws = wb.add_worksheet(_sheet)
+            writer.close()
+            write_monetization_file = True
 
     start_cols = []
     for i, sheet_name in enumerate(sheet_names):
@@ -189,6 +207,18 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets):
             ws = wb[result_sheet_name]
             ws.cell(1, this_start_col + 1).value = this_combined_result
             wb.save(filename)
+
+            if write_monetization_file:
+                _start_col = 0 + (i + 0) * (len(list(combined_table.keys())) + 2)
+                with pd.ExcelWriter(monetization_file, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
+                    combined_table.to_excel(writer, sheet_name=result_sheet_name, startcol=_start_col, startrow=2)
+
+                wb = load_workbook(monetization_file)
+                ws = wb[result_sheet_name]
+                ws.cell(1, _start_col + 1).value = this_combined_result
+                wb.save(monetization_file)
+
+    return write_monetization_file
 
 
 def load_heureka_results(filename, header, sheet_name=None, year_key=None, data_key=None):
@@ -569,8 +599,31 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
         )
 
 
+def modify_monetization_file(write_to_file):
+    with pd.ExcelWriter(write_to_file, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
+        monetization_parameters.to_excel(
+            writer, sheet_name='Parameters', startcol=0, startrow=1, index=False, header=False)
+
+
+def test_modify_monetization_file():
+    mf = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-007 Gudmund Aaker\\FHF23-007 Monetization_V2 WIP.xlsx"
+    modify_monetization_file(mf)
+
+
 def test_write_excel_with_equations():
     from openpyxl import load_workbook
+    from openpyxl.styles import PatternFill
+    from openpyxl.styles import Alignment
+
+    colors = ['00660066', '00FFFFCC',
+              '00FF0000', '0000FF00', '00660066']
+    fillers = []
+
+    for color in colors:
+        temp = PatternFill(patternType='solid',
+                           fgColor=color)
+        fillers.append(temp)
+
     dir_path = os.path.dirname(os.path.realpath(__file__))
     efile = os.path.join(dir_path, 'test.xlsx')
     sheet_names = ['One', 'Two', 'Three']
@@ -592,6 +645,16 @@ def test_write_excel_with_equations():
     for i in range(4):
         ws.cell(i+2, 1).value = '=One!A{}*One!B{}'.format(i+2, i+2)
         ws.cell(i + 2, 2).value = '=One!A{}*Three!$B$1'.format(i + 2)
+        ws.cell(i+2, 1).fill = fillers[0]
+        ws.cell(i + 2, 2).fill = fillers[1]
+    for my_row in ws['C6:D12']:
+        for my_cell in my_row:
+            my_cell.fill = fillers[3]
+
+    ws.cell(1, 4).value = 'TEST'
+    ws.cell(1, 4).alignment = Alignment(horizontal='center')
+    ws.cell(1, 4).fill = fillers[2]
+    ws.merge_cells(start_row=1, start_column=4, end_row=1, end_column=8)
     wb.save(efile)
 
 
@@ -654,3 +717,4 @@ if __name__ == '__main__':
     # test_export_fossagrim_stand()
     # test_export_fossagrim_treatment()
     test_write_excel_with_equations()
+    # test_modify_monetization_file()
