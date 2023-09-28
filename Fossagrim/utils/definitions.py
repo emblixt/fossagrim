@@ -1,6 +1,7 @@
 # https://www.heurekaslu.se/wiki/Import_of_stand_register
 import pandas as pd
 import datetime
+import numpy as np
 
 heureka_mandatory_standdata_keys = [
 	'StandId',
@@ -227,54 +228,82 @@ fossagrim_keys_to_most_of = [
 	'Peat'
 ]
 
+_sep = ','  # ';'
+_dec = '.'  # ','
 monetization_parameters = pd.DataFrame([
 	['hpap', 2, 'Half time for paper [yrs]'],
 	['hsawn', 35, 'Half time for sawn products [yrs]'],
-	['SFsawn', 0.58, 'Substitutionsfaktor  för långlivade produkter, excl end-of-life energiåtervinning'],
+	['SFsawn', '0{}58'.format(_dec), 'Substitutionsfaktor  för långlivade produkter, excl end-of-life energiåtervinning'],
 	['SFpp', '=0.87*B4', 'Substitutionsfaktor för massa och papper'],
 	['SFfuel', '=0.4*B4', 'Substitutionsfaktor för biomassa som avänds som bränsle '],
-	['p', 0.233, 'Andelen av skördat timmer som blir sågade produkter'],
-	['pp', 0.301, 'Andelen av skördad massaved som blir papper'],
-	['pf', 0.159, 'Proportion av skörden som går direkt till energiproduktion'],
-	['psfuel', 0.8, 'Proportion av förluster från poolen sågade trävaror som ger end of life subst'],
-	['k', 0.21, 'Omvandlingsfaktor m3sk till ton C']
+	['p', '0{}233'.format(_dec), 'Andelen av skördat timmer som blir sågade produkter'],
+	['pp', '0{}301'.format(_dec), 'Andelen av skördad massaved som blir papper'],
+	['pf', '0{}159'.format(_dec), 'Proportion av skörden som går direkt till energiproduktion'],
+	['psfuel', '0{}8'.format(_dec), 'Proportion av förluster från poolen sågade trävaror som ger end of life subst'],
+	['k', '0{}21'.format(_dec), 'Omvandlingsfaktor m3sk till ton C']
 ])
 
 monetization_calculation_part1_header = pd.DataFrame([
-	['Sheet updated', datetime.date.today().isoformat(), '', 'Productive, active area, ha', '', 0.0, '', 'Base case pools, ton CO2', '', '', '', '', '', '', '', 'Project case pools, ton CO2', '', 'Climate benefit, ton CO2', '', '', '', '', ''],
-	['By', 'Python script', '', 'Measure, Carbon or CO2?', '', 'CO2', '=IF(F2="C";1;44/12)', 'Unit area: 1 ha', '', '', '', '=CONCATENATE("Active area: ";$F$1;" ha")', '', '', '', '=H2', 'Active area', '=H2', '', '', '=CONCATENATE("Active area: ";$F$1;" ha")', '', ''],
-	['del t', 'year 0', 'Total extracted', 'Total extracted', 'Total extrated to sawn prod', 'Prod pool change', 'Substitution', '=CONCATENATE("Ton ";$F$2;"/ha")', '', '', '', '=CONCATENATE("Total ton ";$F$2;"/ha")', '', '', '', '=CONCATENATE("Ton ";$F$2;"/ha")', '=CONCATENATE("Total ton ";$F$2)', '=CONCATENATE("Ton ";$F$2;"/ha")', '=CONCATENATE("Ton ";$F$2;"/ha/";A5;"yr")', '=CONCATENATE("Ton ";$F$2;"/ha/yr")', '=CONCATENATE("Ton ";$F$2)', '=CONCATENATE("Ton ";$F$2;"/";A5;"yr")', '=CONCATENATE("Ton ";$F$2;"/yr")'],
-	[5, 2024, 'vol fub m3/ha', 'C ton/ha', 'C ton/ha', 'C ton/ha/ 5yr', 'C ton/ha', 'Forest', 'Product', 'Substitution', 'Base case', 'Forest', 'Product', 'Substitution', 'Base case', 'Project', 'Project', 'Accumulated', 'Interval', 'Yearly', 'Accumulated', 'Interval', 'Yearly'],
-	['t', 'year', 'COPY OVER!', '', '', '', '', 'COPY OVER!', '', '', '', '', '', '', '', 'COPY OVER!', '', '', '', '', '', '', ''],
-	['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
+    ['Sheet updated', datetime.date.today().isoformat(), '', 'Productive, active area, ha', '', 0, '',
+     'Base case pools, ton CO2', '', '', '', '', '', '', '', 'Project case pools, ton CO2', '',
+     'Climate benefit, ton CO2', '', '', '', '', ''],
+    ['By', 'Python script', '', 'Measure, Carbon or CO2?', '', 'CO2', '=IF(F2=\"C\"{}1{}44/12)'.format(_sep, _sep),
+     'Unit area: 1 ha', '', '', '', '=CONCATENATE(\"Active area: \"{}$F$1{}\" ha\")'.format(_sep, _sep), '', '', '',
+     '=H2', 'Active area', '=H2', '', '', '=CONCATENATE(\"Active area: \"{}$F$1{}\" ha\")'.format(_sep, _sep), '', ''],
+    ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ['del t', 'year 0', 'Total extracted', 'Total extracted', 'Total extrated to sawn prod', 'Prod pool change',
+     'Substitution', '=CONCATENATE(\"Ton \"{}$F$2{}\"/ha\")'.format(_sep, _sep), '', '', '',
+     '=CONCATENATE(\"Total ton \"{}$F$2{}\"/ha\")'.format(_sep, _sep), '', '', '',
+     '=CONCATENATE(\"Ton \"{}$F$2{}\"/ha\")'.format(_sep, _sep), '=CONCATENATE(\"Total ton \"{}$F$2)'.format(_sep),
+     '=CONCATENATE(\"Ton \"{}$F$2{}\"/ha\")'.format(_sep, _sep),
+     '=CONCATENATE(\"Ton \"{}$F$2{}\"/ha/\"{}A5{}\"yr\")'.format(_sep, _sep, _sep, _sep),
+     '=CONCATENATE(\"Ton \"{}$F$2{}\"/ha/yr\")'.format(_sep, _sep), '=CONCATENATE(\"Ton \"{}$F$2)'.format(_sep),
+     '=CONCATENATE(\"Ton \"{}$F$2{}\"/\"{}A5{}\"yr\")'.format(_sep, _sep, _sep, _sep),
+     '=CONCATENATE(\"Ton \"{}$F$2{}\"/yr\")'.format(_sep, _sep)],
+    [5, 2024, 'vol fub m3/ha', 'C ton/ha', 'C ton/ha', 'C ton/ha/ 5yr', 'C ton/ha', 'Forest', 'Product',
+     'Substitution', 'Base case', 'Forest', 'Product', 'Substitution', 'Base case', 'Project', 'Project',
+     'Accumulated', 'Interval', 'Yearly', 'Accumulated', 'Interval', 'Yearly'],
+    ['t', 'year', 'COPY OVER!', '', '', '', '', 'COPY OVER!', '', '', '', '', '', '', '', 'COPY OVER!', '', '', '',
+     '', '', '', ''],
+    ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
 ])
 
 
 monetization_calculation_part1 = monetization_calculation_part1_header.append(
-	pd.DataFrame([[0,
-		'=B$5+A{}'.format(_row),
-		'="Rearranged results"!AY4*$G$2',
-		'=C{}*k'.format(_row),
-		'=D{}*p'.format(_row),
-		'=IF(H{}>0;I{}-I{};)'.format(_row, _row, _row - 1),
-		'=D{}*(p*SFsawn+pp*SFpp+pf*SFfuel)+(E{}-F{})*psfuel*SFfuel'.format(_row, _row, _row),
-		'="Rearranged results"!AX4*$G$2', '=IF(H{}>0;E{}+I{}*0,5^(5/hsawn);)'.format(_row, _row, _row - 1),
-		'=IF(H{}>0;SUM($G$8:G{});)'.format(_row, _row),
-		'=IF(H{}>0;H{}+I{}+J{};)'.format(_row, _row, _row - 1, _row - 1),
-		'=H{}*$F$1'.format(_row),
-		'=I{}*$F$1'.format(_row),
-		'=J{}*$F$1'.format(_row),
-		'=K{}*$F$1'.format(_row),
-		'="Rearranged results"!BI4*$G$2',
-		'=P{}*$F$1'.format(_row),
-		'=P{}-K{}'.format(_row, _row),
-		'=IF(H{}>0;R{}-R{};)'.format(_row, _row, _row - 1),
-		'=S{}/$A$5'.format(_row),
-		'=Q{}-O{}'.format(_row, _row),
-		'=IF(H{}>0;U{}-U{};)'.format(_row, _row, _row - 1),
-		'=V{}/$A$5'.format(_row)] for _row in np.arange(8, 49)]))
+    pd.DataFrame([['=$A$5 *  (row() - 8)',
+                   '=B$5+A{}'.format(_row),
+                   '=\'Rearranged results\'!G{}*$G$2'.format(_row - 4),
+                   '=C{}*k'.format(_row),
+                   '=D{}*p'.format(_row),
+                   '=IF(H{}>0{}I{}-I{}{})'.format(_row, _sep, _row, _row - 1, _sep),
+                   '=D{}*(p*SFsawn+pp*SFpp+pf*SFfuel)+(E{}-F{})*psfuel*SFfuel'.format(_row, _row, _row),
+                   '=\'Rearranged results\'!F{}*$G$2'.format(_row - 4),
+                   '=IF(H{}>0{}E{}+I{}*0{}5^(5/hsawn){})'.format(_row, _sep, _row, _row - 1, _dec, _sep),
+                   '=IF(H{}>0{}SUM($G$8:G{}){})'.format(_row, _sep, _row, _sep),
+                   '=IF(H{}>0{}H{}+I{}+J{}{})'.format(_row, _sep, _row, _row - 1, _row - 1, _sep),
+                   '=H{}*$F$1'.format(_row),
+                   '=I{}*$F$1'.format(_row),
+                   '=J{}*$F$1'.format(_row),
+                   '=K{}*$F$1'.format(_row),
+                   '=\'Rearranged results\'!Q{}*$G$2'.format(_row - 4),
+                   '=P{}*$F$1'.format(_row),
+                   '=P{}-K{}'.format(_row, _row),
+                   '=IF(H{}>0{}R{}-R{}{})'.format(_row, _sep, _row, _row - 1, _sep),
+                   '=S{}/$A$5'.format(_row),
+                   '=Q{}-O{}'.format(_row, _row),
+                   '=IF(H{}>0{}U{}-U{}{})'.format(_row, _sep, _row, _row - 1, _sep),
+                   '=V{}/$A$5'.format(_row)] for _row in np.arange(8, 49)]))
 
 
+monetization_resampled_section = pd.DataFrame([
+    ['Resampled Climate benefit, ton CO2', '', '', '', 'Climate benefit', ''],
+    ['', '', '', '', '', '' ],
+    ['', '', '', '', '', '' ],
+    ['', '', 'Ton CO2/yr', 'Ton CO2/yr', 'Ton CO2/yr', 'Ton CO2'],
+    ['', '', 'Linear intpol / 5yr', 'Running average', 'Annual Climate benefit', 'Accumulated Climate benefit'],
+    ['t', 'year', '', '', '', ''],
+    ['', '', '', '', '', '']
+])
 def translate_keys_from_fossagrim_to_heureka():
 	translation = {}
 	for key in fossagrim_standdata_keys:

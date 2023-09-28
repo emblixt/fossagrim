@@ -1,14 +1,14 @@
+import openpyxl
 import pandas as pd
 import numpy as np
 import os
-import unittest
 
 from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, \
     heureka_standdata_keys, heureka_standdata_desc, \
     heureka_treatment_keys, heureka_treatment_desc, \
     fossagrim_standdata_keys, \
     translate_keys_from_fossagrim_to_heureka,\
-    monetization_parameters
+    monetization_parameters, monetization_calculation_part1
 
 
 def get_row_index(table, key, item):
@@ -599,14 +599,49 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
         )
 
 
-def modify_monetization_file(write_to_file):
+def modify_monetization_file(write_to_file, **_kwargs):
+    from openpyxl.workbook.defined_name import DefinedName
     with pd.ExcelWriter(write_to_file, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
         monetization_parameters.to_excel(
             writer, sheet_name='Parameters', startcol=0, startrow=1, index=False, header=False)
+        monetization_calculation_part1.to_excel(
+            writer, sheet_name='Monetization', startcol=0, startrow=0, index=False, header=False)
+
+    # Modify monetization file with constants kwargs
+    total_area = _kwargs['total_area']
+    wb = openpyxl.load_workbook(write_to_file)
+    ws = wb['Monetization']
+    if total_area is not None:
+        ws['F1'].value = total_area/10.  # from mål to Ha
+    wb.save(write_to_file)
+
+    # Create defined name (name manager) using openpyxl
+    wb = openpyxl.load_workbook(write_to_file)
+    hpap = openpyxl.workbook.defined_name.DefinedName("hpap", attr_text='Parameters!$B$2')
+    wb.defined_names.add(hpap)
+    hsawn = openpyxl.workbook.defined_name.DefinedName("hsawn", attr_text='Parameters!$B$3')
+    wb.defined_names.add(hsawn)
+    sfsawn = openpyxl.workbook.defined_name.DefinedName("SFsawn", attr_text='Parameters!$B$4')
+    wb.defined_names.add(sfsawn)
+    sfpp = openpyxl.workbook.defined_name.DefinedName("SFpp", attr_text='Parameters!$B$5')
+    wb.defined_names.add(sfpp)
+    sffuel = openpyxl.workbook.defined_name.DefinedName("SFfuel", attr_text='Parameters!$B$6')
+    wb.defined_names.add(sffuel)
+    p = openpyxl.workbook.defined_name.DefinedName("p", attr_text='Parameters!$B$7')
+    wb.defined_names.add(p)
+    pp = openpyxl.workbook.defined_name.DefinedName("pp", attr_text='Parameters!$B$8')
+    wb.defined_names.add(pp)
+    pf = openpyxl.workbook.defined_name.DefinedName("pf", attr_text='Parameters!$B$9')
+    wb.defined_names.add(pf)
+    psfuel = openpyxl.workbook.defined_name.DefinedName("psfuel", attr_text='Parameters!$B$10')
+    wb.defined_names.add(psfuel)
+    k = openpyxl.workbook.defined_name.DefinedName("k", attr_text='Parameters!$B$11')
+    wb.defined_names.add(k)
+    wb.save(write_to_file)
 
 
 def test_modify_monetization_file():
-    mf = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-007 Gudmund Aaker\\FHF23-007 Monetization_V2 WIP.xlsx"
+    mf = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\XXX"
     modify_monetization_file(mf)
 
 
@@ -659,8 +694,8 @@ def test_write_excel_with_equations():
 
 
 def test_rearrange():
-    file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Heureka results COPY.xlsx"
-    rearrange_raw_heureka_results(file, ['FHF23-003 Business as usual', 'FHF23-003 Preservation'])
+    file = "C:\\User\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Heureka results.xlsx"
+    rearrange_raw_heureka_results(file, ['FHF23-999 Avg Stand-Pine BAU', 'FHF23-999 Avg Stand-Pine PRES'])
 
 
 def test_write_csv_file():
@@ -716,5 +751,5 @@ if __name__ == '__main__':
     # test_rearrange()
     # test_export_fossagrim_stand()
     # test_export_fossagrim_treatment()
-    test_write_excel_with_equations()
-    # test_modify_monetization_file()
+    # test_write_excel_with_equations()
+    test_modify_monetization_file()

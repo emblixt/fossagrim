@@ -9,7 +9,7 @@ methods = ['BAU', 'PRES']  # "Business as usual" and "Preservation"
 
 
 def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_over, _stand_id_key, _project_tag,
-                   verbose=False):
+                   verbose=False, **_kwargs):
     fio.export_fossagrim_stand_to_heureka(
         _stand_file,
         _csv_stand_file,
@@ -28,7 +28,7 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
     )
 
 
-def arrange_results(_result_file, _sheet_names, _combine_sheets, _monetization_file):
+def arrange_results(_result_file, _sheet_names, _combine_sheets, _monetization_file, **_kwargs):
     # sheet names in the resulting excel file
     write_monetization_file = \
         fio.rearrange_raw_heureka_results(
@@ -38,7 +38,7 @@ def arrange_results(_result_file, _sheet_names, _combine_sheets, _monetization_f
         print('Try to modify Monetization file')
         # TODO
         # implement this
-        fio.modify_monetization_file(_monetization_file)
+        fio.modify_monetization_file(_monetization_file, **_kwargs)
 
 
 def project_settings(_project_tag, _project_settings_file):
@@ -102,10 +102,12 @@ def project_settings(_project_tag, _project_settings_file):
             ws = wb.add_worksheet(_sheet)
         writer.close()
 
+    total_area = None
     combine_positions = [_x.strip() for _x in p_tabl['Position of fractions when combined'][i].split(',')]
     wb = openpyxl.load_workbook(_stand_file, data_only=True)
     ws = wb.active
     combine_fractions = [ws[_x].value for _x in combine_positions]
+    total_area = ws[p_tabl['Position of total area'][i]].value
     wb.close()
     _combine_sheets = {}
     for j, method in enumerate(methods):
@@ -115,9 +117,11 @@ def project_settings(_project_tag, _project_settings_file):
             _this_list.append(c_frac)
         _combine_sheets['{} Combined Stands {} {}'.format(_project_tag, '-and-'.join(forest_types), method)] = \
             _this_list
-
+    _kwargs = {
+        'total_area': total_area
+    }
     return _project_folder, _stand_file, _average_over, _stand_id_key, _result_file, _result_sheets, _combine_sheets, \
-        _monetization_file, _csv_stand_file, _csv_treatment_file
+        _monetization_file, _csv_stand_file, _csv_treatment_file, _kwargs
 
 
 def project_settings_old(_project_tag):
@@ -345,7 +349,7 @@ def project_settings_old(_project_tag):
 
 
 if __name__ == '__main__':
-    project_tag = 'FHF23-007'
+    project_tag = 'FHF23-999'
     project_settings_file = 'C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx'
 
     fix_import = False  # Set to False after Heureka simulation results have been saved in result_file and you want to
@@ -356,11 +360,12 @@ if __name__ == '__main__':
     # project_folder, stand_file, average_over, stand_id_key, result_file, result_sheets, combine_sheets, \
     # csv_stand_file, csv_treatment_file = project_settings_old(project_tag)
     project_folder, stand_file, average_over, stand_id_key, result_file, result_sheets, combine_sheets, \
-        monetization_file, csv_stand_file, csv_treatment_file = project_settings(project_tag, project_settings_file)
+        monetization_file, csv_stand_file, csv_treatment_file, kwargs = \
+        project_settings(project_tag, project_settings_file)
 
     if fix_import:
         arrange_import(stand_file, csv_stand_file, csv_treatment_file, average_over, stand_id_key, project_tag,
-                       verbose=verbose)
+                       verbose=verbose, **kwargs)
     else:
-        arrange_results(result_file, result_sheets, combine_sheets, monetization_file)
+        arrange_results(result_file, result_sheets, combine_sheets, monetization_file, **kwargs)
 
