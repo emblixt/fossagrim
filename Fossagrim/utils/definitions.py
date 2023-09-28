@@ -297,13 +297,23 @@ monetization_calculation_part1 = monetization_calculation_part1_header.append(
 
 monetization_resampled_section = pd.DataFrame([
     ['Resampled Climate benefit, ton CO2', '', '', '', 'Climate benefit', ''],
-    ['', '', '', '', '', '' ],
-    ['', '', '', '', '', '' ],
-    ['', '', 'Ton CO2/yr', 'Ton CO2/yr', 'Ton CO2/yr', 'Ton CO2'],
+    ['', '', '', '', '', ''],
+    ['', '', '', '', '', ''],
+    ['', '', '=CONCATENATE(\"Ton \"{}$F$2{}\"/yr")'.format(_sep, _sep),
+     '=CONCATENATE(\"Ton \"{}$F$2{}\"/yr")'.format(_sep, _sep), 'Ton CO2/yr', 'Ton CO2'],
     ['', '', 'Linear intpol / 5yr', 'Running average', 'Annual Climate benefit', 'Accumulated Climate benefit'],
     ['t', 'year', '', '', '', ''],
     ['', '', '', '', '', '']
 ])
+
+monetization_resampled_section = monetization_resampled_section.append(
+    pd.DataFrame([
+       ['{}'.format(_row),
+        '=$B$5+Y{}'.format(_row + 8),
+        '=$W{}'.format(9 + int((_row - np.mod(_row, 5))/5)),  # +1 in every 5 iteration
+        ] for _row in np.arange(103)])
+)
+
 def translate_keys_from_fossagrim_to_heureka():
 	translation = {}
 	for key in fossagrim_standdata_keys:
