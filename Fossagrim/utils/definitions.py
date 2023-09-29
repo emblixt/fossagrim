@@ -311,8 +311,14 @@ monetization_resampled_section = monetization_resampled_section.append(
        ['{}'.format(_row),
         '=$B$5+Y{}'.format(_row + 8),
         '=$W{}'.format(9 + int((_row - np.mod(_row, 5))/5)),  # +1 in every 5 iteration
+        '=AVERAGE(AA{}:AA{})'.format(_row + 8 - 2,  _row + 8 + 2),
+        '=AB{}*IF($F$2=\"C\"{}44/12{}1)'.format(_row + 8, _sep, _sep),
+        '=SUM($AC$8:AC{})'.format(_row + 8)
         ] for _row in np.arange(103)])
 )
+monetization_resampled_section.iloc[7, 3] = '{} + (AB10-AB12)'.format(monetization_resampled_section.iloc[7, 3])
+monetization_resampled_section.iloc[8, 3] = '{} + (AB10-AB11)'.format(monetization_resampled_section.iloc[8, 3])
+
 
 def translate_keys_from_fossagrim_to_heureka():
 	translation = {}
