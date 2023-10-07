@@ -7,8 +7,10 @@ from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, \
     heureka_standdata_keys, heureka_standdata_desc, \
     heureka_treatment_keys, heureka_treatment_desc, \
     fossagrim_standdata_keys, \
-    translate_keys_from_fossagrim_to_heureka,\
-    monetization_parameters, monetization_calculation_part1
+    translate_keys_from_fossagrim_to_heureka
+from Fossagrim.utils.monetization_parameters import \
+    parameters, calculation_part1, resampled_section,\
+    money_value, cbo_flow, project_benefits, buffer
 
 
 def get_row_index(table, key, item):
@@ -601,18 +603,52 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
 
 def modify_monetization_file(write_to_file, **_kwargs):
     from openpyxl.workbook.defined_name import DefinedName
+    from openpyxl.styles import NamedStyle
+
+    # Create named styles
+    date_style = NamedStyle(name='date_style', number_format='YYYY-MM-DD')
+
     with pd.ExcelWriter(write_to_file, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
-        monetization_parameters.to_excel(
+        parameters.to_excel(
             writer, sheet_name='Parameters', startcol=0, startrow=1, index=False, header=False)
-        monetization_calculation_part1.to_excel(
+        calculation_part1.to_excel(
             writer, sheet_name='Monetization', startcol=0, startrow=0, index=False, header=False)
+        resampled_section.to_excel(
+            writer, sheet_name='Monetization', startcol=24, startrow=0, index=False, header=False)
+        money_value.to_excel(
+            writer, sheet_name='Monetization', startcol=30, startrow=1, index=False, header=False)
+        cbo_flow.to_excel(
+            writer, sheet_name='Monetization', startcol=35, startrow=1, index=False, header=False)
+        project_benefits.to_excel(
+            writer, sheet_name='Monetization', startcol=39, startrow=1, index=False, header=False)
+        buffer.to_excel(
+            writer, sheet_name='Monetization', startcol=49, startrow=2, index=False, header=False)
 
     # Modify monetization file with constants kwargs
-    total_area = _kwargs['total_area']
     wb = openpyxl.load_workbook(write_to_file)
+
+    # add the styles
+    wb.add_named_style(date_style)
+
     ws = wb['Monetization']
-    if total_area is not None:
-        ws['F1'].value = total_area/10.  # from mål to Ha
+    ws['F1'].value = _kwargs['Position of total area']/10.  # from mål to Ha
+    ws['AF3'].value = _kwargs['Position of Flow 1 total volume']
+    ws['AG3'].value = _kwargs['Position of Flow 2 total volume']
+    ws['AI3'].value = _kwargs['Position of Flow 1 total volume'] + _kwargs['Position of Flow 2 total volume'] + \
+        _kwargs['Position of passive forest total volume']
+    ws['AF5'].value = _kwargs['Flow 1 start date']
+    ws['AG6'].value = _kwargs['Flow 2 delay']
+    ws['AF8'].value = _kwargs['Root net']
+    ws['AN4'].value = _kwargs['Contract length']
+    ws['AO4'].value = _kwargs['Rent']
+    ws['AP4'].value = _kwargs['Price growth']
+    ws['AX4'].value = _kwargs['Buffer']
+    ws['AY4'].value = _kwargs['Reserve years']
+    for _pos in ['AF5', 'AG5', 'AK4', 'AL4']:
+        ws[_pos].style = 'date_style'
+    for _pos in ['AF4', 'AG4', 'AH4', 'AI4', 'AK3', 'AL3', 'AM3',  'AO4', 'AP4', 'AQ4', 'AX4']:
+        ws[_pos].number_format = '0.0%'
+
     wb.save(write_to_file)
 
     # Create defined name (name manager) using openpyxl
