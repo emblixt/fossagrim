@@ -120,7 +120,9 @@ def project_settings(_project_tag, _project_settings_file):
         'Rent',
         'Price growth',
         'Buffer',
-        'Reserve years'
+        'Reserve years',
+        'Net price',
+        'Gross price'
     ]
     _kwargs = {
         _key: ws[p_tabl[_key][i]].value for _key in _kwarg_position_keys

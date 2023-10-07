@@ -172,3 +172,35 @@ buffer = pd.concat([
             '=IF(BA{}>0{}SUM($BA$8:BA{}){})'.format(_row+8, _sep, _row+8, _sep),
         ] for _row in np.arange(103)])
 ], ignore_index=True)
+
+values = pd.concat([
+    pd.DataFrame([
+        ['', '', '', 'Ref price', '=AH9/SUM(BG8:BG78)', '', '', '', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', '', '', 'Mark-up / handling fee', '', '', '', '', ''],
+        ['', '', '', 'Sales', '', '', '', '', '', '=(BI8-BH8)/BH8', '', '', '', '', ''],
+        ['', '', '', '', 'Forest Owner', 'Total', 'Fossagrim', '', '',
+         '=CONCATENATE(\"Annual revenue at \"{}BI8{}\"kr/ton\"'.format(_sep, _sep),
+         'Total revenue', '', 'Forest owner', '', ''],
+        ['Year', 'Project Benefit', 'Buffer', 'Offsets', 'Net price', 'Gross Price', 'Cut', 'Sales margin',
+         'Gross sales', 'Fossagrim', 'Accum Fossagrim', 'Year', 'Est annual rev', 'Est total rev', 'Sales completion'],
+        ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
+        ]),
+    pd.DataFrame([
+        [
+            '=Y{}+1'.format(_row+8),
+            '=AP{}'.format(_row + 8),
+            '=IF(AX{}{}-AX{}{}BA{})'.format(_row+8, _sep, _row+8, _sep, _row+8),
+            '=AP{}-AX{}+BA{}'.format(_row+8, _row+8, _row+8),
+            '=IF(BG{}>0{}BH{}{})'.format(_row+8, _sep, _row+7, _sep),
+            '=BH{}*(1+$BM$4)'.format(_row+8),
+            '=BI{}-BH{}'.format(_row+8, _row+8),
+            '=IF(BI{}{}BJ{}/BI{}{})'.format(_row+8, _sep, _row+8, _row+8, _sep),
+            '=BI{}*$BG{}'.format(_row+8, _row+8),
+            '=BG{}*$BJ{}'.format(_row+8, _row+8),
+            '=IF(AN{}>0{}SUM(BM$8:BM{}){})'.format(_row+8, _sep, _row+8, _sep),
+            '=BD{}'.format(_row + 8),
+            '=BL{}-BM{}'.format(_row + 8, _row + 8),
+            '=IF(AO{}>0{}SUM(BP$8:BP{}){})'.format(_row + 8, _sep, _row + 8, _sep),
+            '=SUM(BP$8:BP{})/SUM(BP$8:BP$78)'.format(_row+8)
+        ] for _row in np.arange(103)])
+], ignore_index=True)

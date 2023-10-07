@@ -10,7 +10,7 @@ from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, \
     translate_keys_from_fossagrim_to_heureka
 from Fossagrim.utils.monetization_parameters import \
     parameters, calculation_part1, resampled_section,\
-    money_value, cbo_flow, project_benefits, buffer
+    money_value, cbo_flow, project_benefits, buffer, values
 
 
 def get_row_index(table, key, item):
@@ -603,10 +603,6 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
 
 def modify_monetization_file(write_to_file, **_kwargs):
     from openpyxl.workbook.defined_name import DefinedName
-    from openpyxl.styles import NamedStyle
-
-    # Create named styles
-    date_style = NamedStyle(name='date_style', number_format='YYYY-MM-DD')
 
     with pd.ExcelWriter(write_to_file, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
         parameters.to_excel(
@@ -623,12 +619,11 @@ def modify_monetization_file(write_to_file, **_kwargs):
             writer, sheet_name='Monetization', startcol=39, startrow=1, index=False, header=False)
         buffer.to_excel(
             writer, sheet_name='Monetization', startcol=49, startrow=2, index=False, header=False)
+        values.to_excel(
+            writer, sheet_name='Monetization', startcol=55, startrow=1, index=False, header=False)
 
     # Modify monetization file with constants kwargs
     wb = openpyxl.load_workbook(write_to_file)
-
-    # add the styles
-    wb.add_named_style(date_style)
 
     ws = wb['Monetization']
     ws['F1'].value = _kwargs['Position of total area']/10.  # from mål to Ha
@@ -644,12 +639,12 @@ def modify_monetization_file(write_to_file, **_kwargs):
     ws['AP4'].value = _kwargs['Price growth']
     ws['AX4'].value = _kwargs['Buffer']
     ws['AY4'].value = _kwargs['Reserve years']
-    for _pos in ['AF5', 'AG5', 'AK4', 'AL4']:
-        ws[_pos].style = 'date_style'
-    for _pos in ['AF4', 'AG4', 'AH4', 'AI4', 'AK3', 'AL3', 'AM3',  'AO4', 'AP4', 'AQ4', 'AX4']:
-        ws[_pos].number_format = '0.0%'
+    ws['BH8'].value = _kwargs['Net price']
+    ws['BI8'].value = _kwargs['Gross price']
 
     wb.save(write_to_file)
+
+    style_monetization_file(write_to_file)
 
     # Create defined name (name manager) using openpyxl
     wb = openpyxl.load_workbook(write_to_file)
@@ -673,6 +668,55 @@ def modify_monetization_file(write_to_file, **_kwargs):
     wb.defined_names.add(psfuel)
     k = openpyxl.workbook.defined_name.DefinedName("k", attr_text='Parameters!$B$11')
     wb.defined_names.add(k)
+    wb.save(write_to_file)
+
+
+def style_monetization_file(write_to_file):
+    from openpyxl.styles import NamedStyle
+    from openpyxl.styles import PatternFill
+    from openpyxl.styles import Alignment
+
+    colors = [
+        'd9e1f2',
+        'f4b084',
+        'f8cbad'
+    ]
+    fillers = []
+
+    for color in colors:
+        temp = PatternFill(patternType='solid',
+                           fgColor=color)
+        fillers.append(temp)
+
+    # Create named styles
+    date_style = NamedStyle(name='date_style', number_format='YYYY-MM-DD')
+
+    wb = openpyxl.load_workbook(write_to_file)
+
+    # add the styles
+    wb.add_named_style(date_style)
+
+    ws = wb['Monetization']
+
+    for _pos in ['AF5', 'AG5', 'AK4', 'AL4']:
+        ws[_pos].style = 'date_style'
+    for _pos in ['AF4', 'AG4', 'AH4', 'AI4', 'AK3', 'AL3', 'AM3',  'AO4', 'AP4', 'AQ4', 'AX4', 'BM4']:
+        ws[_pos].number_format = '0.0%'
+    for _row in np.arange(8, 109):
+        ws['BK{}'.format(_row)].number_format = '0.0%'
+        ws['BR{}'.format(_row)].number_format = '0.0%'
+
+    for my_row in ws['A1:G50']:
+        for my_cell in my_row:
+            my_cell.fill = fillers[0]
+    for my_row in ws['C3:F50']:
+        for my_cell in my_row:
+            my_cell.fill = fillers[1]
+    for my_row in ws['G3:G50']:
+        for my_cell in my_row:
+            my_cell.fill = fillers[2]
+
+
     wb.save(write_to_file)
 
 
