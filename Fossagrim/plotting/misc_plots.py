@@ -1,10 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import os
 import Fossagrim.utils.projects as fup
 import Fossagrim.io.fossagrim_io as fio
 
 markers = ['o', 'v', '^', '<', '>', 's', 'p', 'P', '*', 'X', 'D']
+
 
 def find_first_index(table, key, value):
 	found = False
@@ -69,3 +71,18 @@ def plot_plant_density():
 	plt.show()
 
 	return spruce_sis, pine_sis, spruce_plant_den, pine_plant_den
+
+
+def plot_raw_data(data_dict, data_tag, my_title, qc_plot_dir):
+	fig, ax = plt.subplots(figsize=(12, 12))
+	_x = data_dict['Year']
+	for key, _y in data_dict.items():
+		if key in ['Year', 'Treatment', 'Unit']:
+			continue
+		ax.plot(_x, _y, label=key)
+	ax.set_title('{} {}'.format(my_title, data_tag))
+	ax.set_xlabel('Year')
+	ax.grid(True)
+	ax.legend()
+	fig.savefig(os.path.join(qc_plot_dir, '{}_{}.png'.format(my_title.lower().replace(' ', '_'), data_tag)))
+

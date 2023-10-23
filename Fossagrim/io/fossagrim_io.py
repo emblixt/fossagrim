@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import openpyxl
 import pandas as pd
 import numpy as np
@@ -11,6 +12,8 @@ from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, \
 from Fossagrim.utils.monetization_parameters import \
     parameters, calculation_part1, resampled_section,\
     money_value, cbo_flow, project_benefits, buffer, values
+
+import Fossagrim.plotting.misc_plots as fpp
 
 
 def get_row_index(table, key, item):
@@ -97,7 +100,7 @@ def write_csv_file(write_to_file, default_keys, default_desc, append=False, **kw
             f.write(';'.join(data)+'\n')
 
 
-def read_raw_heureka_results(filename, sheet_name):
+def read_raw_heureka_results(filename, sheet_name, verbose=False):
     """
     Read heureka results as exported from Heureka (by simply copying a simulation result and pasting it
     into an empty sheet in Excel) and returns the data in a transposed DataFrame with one line for each period (5 years)
@@ -105,6 +108,9 @@ def read_raw_heureka_results(filename, sheet_name):
 
     :param filename:
     :param sheet_name:
+    :param verbose:
+        bool
+        creates qc plot(s)
     :return:
         panda DataFrame
 
@@ -120,10 +126,26 @@ def read_raw_heureka_results(filename, sheet_name):
         row_i = get_row_index(table, 'Variable', variable)
         data_dict[variable] = table.iloc[row_i, 3:][five_years]
 
+    if verbose:
+        qc_plot_dir = os.path.join(os.path.split(filename)[0], 'QC_plots')
+        fpp.plot_raw_data(data_dict, sheet_name, 'Raw Data', qc_plot_dir)
+
+        # fig, ax = plt.subplots(figsize=(12, 12))
+        # _x = data_dict['Year']
+        # for key, _y in data_dict.items():
+        #     if key in ['Year', 'Treatment', 'Unit']:
+        #         continue
+        #     ax.plot(_x, _y, label=key)
+        # ax.set_title('Raw Heureka {}'.format(sheet_name))
+        # ax.set_xlabel('Year')
+        # ax.grid(True)
+        # ax.legend()
+        # fig.savefig(os.path.join(qc_plot_dir, 'raw_heureka_{}.png'.format(sheet_name)))
+
     return pd.DataFrame(data=data_dict)
 
 
-def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetization_file=None):
+def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetization_file=None, verbose=False):
     """
 
     :param filename:
@@ -141,7 +163,9 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
     :param monetization_file:
         str
         Full path name of monetization file which we try to generate if not existing
-
+    :param verbose:
+        bool
+        creates qc plot(s)
     :return:
     """
     from openpyxl import load_workbook
@@ -163,7 +187,7 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
 
     start_cols = []
     for i, sheet_name in enumerate(sheet_names):
-        table = read_raw_heureka_results(filename, sheet_name)
+        table = read_raw_heureka_results(filename, sheet_name, verbose=verbose)
         this_start_col = i * (len(list(table.keys())) + 2)
         with pd.ExcelWriter(filename, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
             table.to_excel(writer, sheet_name=result_sheet_name, startcol=this_start_col, startrow=2)
@@ -219,6 +243,10 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
                 ws = wb[result_sheet_name]
                 ws.cell(1, _start_col + 1).value = this_combined_result
                 wb.save(monetization_file)
+
+            if verbose:
+                qc_plot_dir = os.path.join(os.path.split(filename)[0], 'QC_plots')
+                fpp.plot_raw_data(combined_dict, this_combined_result, 'Combined', qc_plot_dir)
 
     return write_monetization_file
 
@@ -675,21 +703,30 @@ def style_monetization_file(write_to_file):
     from openpyxl.styles import NamedStyle
     from openpyxl.styles import PatternFill
     from openpyxl.styles import Alignment
+    from openpyxl.styles import Font
 
-    colors = [
-        'd9e1f2',
-        'f4b084',
-        'f8cbad'
-    ]
-    fillers = []
-
-    for color in colors:
-        temp = PatternFill(patternType='solid',
-                           fgColor=color)
-        fillers.append(temp)
+    colors = {
+        'd9e1f2': ['A1:G50'],
+        'f4b084': ['C3:F50'],
+        'f8cbad': ['G3:G50'],
+        'ffc000': ['H1:O50'],
+        'ffd966': ['L2:O50'],
+        'C6E0B4': ['P1:Q50'],
+        'E2EFDA': ['Q2:Q50', 'BD2:BR110'],
+        'BDD7EE': ['R1:W50', 'AN2:AW110'],
+        'DDEBF7': ['U2:W50', 'AC1:AD110'],
+        '9BC2E6': ['Y1:AB110', 'AX2:BC110'],
+        'FCE4D6': ['AE2:AI9'],
+        'FFF2CC': ['AJ1:AM110']
+    }
 
     # Create named styles
     date_style = NamedStyle(name='date_style', number_format='YYYY-MM-DD')
+    no_fill = openpyxl.styles.PatternFill(fill_type=None)
+    no_side = openpyxl.styles.Side(border_style=None)
+    side = openpyxl.styles.Side(border_style='thin')
+    no_border = openpyxl.styles.borders.Border(left=no_side, right=no_side, top=no_side, bottom=no_side)
+    all_border = openpyxl.styles.borders.Border(left=side, right=side, top=side, bottom=side)
 
     wb = openpyxl.load_workbook(write_to_file)
 
@@ -706,18 +743,106 @@ def style_monetization_file(write_to_file):
         ws['BK{}'.format(_row)].number_format = '0.0%'
         ws['BR{}'.format(_row)].number_format = '0.0%'
 
-    for my_row in ws['A1:G50']:
-        for my_cell in my_row:
-            my_cell.fill = fillers[0]
-    for my_row in ws['C3:F50']:
-        for my_cell in my_row:
-            my_cell.fill = fillers[1]
-    for my_row in ws['G3:G50']:
-        for my_cell in my_row:
-            my_cell.fill = fillers[2]
+    for color in list(colors.keys()):
+        for my_pos in colors[color]:
+            for my_row in ws[my_pos]:
+                for my_cell in my_row:
+                    my_cell.fill = PatternFill(patternType='solid', fgColor=color)
+    for my_cell_pos in ['A5', 'B5', 'F1', 'F2', 'AF3', 'AG3', 'AI3', 'AF5', 'AG6', 'AN4','AO4','AP4', 'AQ4', 'AT4',
+                        'AX4', 'AY4', 'BH8', 'BI8']:
+        ws[my_cell_pos].fill = no_fill
+        ws[my_cell_pos].border = all_border
 
+    for rng in ['H1:O1', 'P1:Q1', 'R1:W1', 'Y1:AB1', 'AC1:AD1',
+                'H4:K4', 'L4:O4', 'BG4:BL4', 'BP5:BR5']:
+        ws.merge_cells(rng)
+        ws[rng.split(':')[0]].alignment = Alignment(horizontal='center', vertical='center')
+        ws[rng.split(':')[0]].font = Font(bold=True)
+
+    for rng in ['C8:C50', 'P8:P50', 'H4:W5', 'BH9:BI50', 'BO5:BR50']:
+        for my_row in ws[rng]:
+            for my_cell in my_row:
+                my_cell.border = all_border
 
     wb.save(write_to_file)
+
+
+def qc_plots(monetization_file):
+    wb = openpyxl.load_workbook(monetization_file, data_only=True)
+    ws = wb['Monetization']
+    annual_climate_benefit_unit = ws['AC4'].value
+    accum_climate_benefit_unit = ws['AD4'].value
+    resampled_climate_benefit_unit = ws['AA4'].value
+    overview_unit = ws['H4'].value
+    wb.close()
+    table = pd.read_excel(monetization_file, sheet_name='Monetization', header=5)
+    qc_plot_dir = os.path.join(os.path.split(monetization_file)[0], 'QC_plots')
+
+    def annual_climate_benefit():
+        x = table['t.1'].values
+        y1 = table['30 yr contract'].values
+        y2 = table['Unnamed: 28'].values
+        y3 = table['100 yr contract'].values
+        fig, ax = plt.subplots()
+        ax.plot(x, y2, 'y-', label='Climate benefit')
+        ax.plot(x, y1, 'b-', label='30 yr contract')
+        ax.plot(x, y3, 'b.', label='100 yr contract')
+        ax.set_title('Annual Climate Benefit')
+        ax.set_xlabel('Years')
+        ax.set_ylabel(annual_climate_benefit_unit)
+        ax.legend()
+        ax.grid(True)
+        fig.savefig(os.path.join(qc_plot_dir, 'annual_climate_benefit.png'))
+
+    def accumulated_climate_benefit():
+        x = table['t.1'].values
+        y1 = table['30 yr contract.1'].values
+        y2 = table['Unnamed: 29'].values
+        y3 = table['100 yr contract.1'].values
+        fig, ax = plt.subplots()
+        ax.plot(x, y2, 'y-', label='Climate benefit')
+        ax.plot(x, y1, 'b-', label='30 yr contract')
+        ax.plot(x, y3, 'b.', label='100 yr contract')
+        ax.set_title('Accumulated Climate Benefit')
+        ax.set_xlabel('Years')
+        ax.set_ylabel(accum_climate_benefit_unit)
+        ax.legend()
+        ax.grid(True)
+        fig.savefig(os.path.join(qc_plot_dir, 'accumulated_climate_benefit.png'))
+
+    def resampled_climate_benefit():
+        x = table['t.1'].values
+        y1 = table['Unnamed: 27'].values
+        y2 = table['Unnamed: 26'].values
+        fig, ax = plt.subplots()
+        ax.plot(x, y2, 'y.', label='Linear intpol / 5yr')
+        ax.plot(x, y1, 'b-', label='Running average')
+        ax.set_title('Resampled Climate Benefit')
+        ax.set_xlabel('Years')
+        ax.set_ylabel(resampled_climate_benefit_unit)
+        ax.legend()
+        ax.grid(True)
+        fig.savefig(os.path.join(qc_plot_dir, 'resampled_climate_benefit.png'))
+
+    def overview():
+        x = table['year'].values
+        y1 = table['COPY OVER!.1'].values  # Base case
+        y2 = table['COPY OVER!.2'].values  # Project case
+        y3 = table['Unnamed: 8'].values  # Product
+        y4 = table['Unnamed: 9'].values  # Substitution
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.plot(x, y1, label='Base case forest')
+        ax.plot(x, y1 + y3, label='Base case product')
+        ax.plot(x, y1 + y4, label='Base case substitution')
+        ax.plot(x, y2, label='Project case')
+        ax.set_title('Overview')
+        ax.set_xlabel('Year')
+        ax.set_ylabel(overview_unit)
+        ax.legend()
+        ax.grid(True)
+        fig.savefig(os.path.join(qc_plot_dir, 'overview.png'))
+
+    overview()
 
 
 def test_modify_monetization_file():

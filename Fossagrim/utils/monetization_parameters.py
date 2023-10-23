@@ -173,13 +173,15 @@ buffer = pd.concat([
         ] for _row in np.arange(103)])
 ], ignore_index=True)
 
+# TODO
+# This section causes problem in excel!
 values = pd.concat([
     pd.DataFrame([
         ['', '', '', 'Ref price', '=AH9/SUM(BG8:BG78)', '', '', '', '', '', '', '', '', '', ''],
         ['', '', '', '', '', '', '', '', '', 'Mark-up / handling fee', '', '', '', '', ''],
         ['', '', '', 'Sales', '', '', '', '', '', '=(BI8-BH8)/BH8', '', '', '', '', ''],
         ['', '', '', '', 'Forest Owner', 'Total', 'Fossagrim', '', '',
-         '=CONCATENATE(\"Annual revenue at \"{}BI8{}\"kr/ton\"'.format(_sep, _sep),
+         '=CONCATENATE(\"Annual revenue at \"{}BI8{}\"kr/ton\")'.format(_sep, _sep),
          'Total revenue', '', 'Forest owner', '', ''],
         ['Year', 'Project Benefit', 'Buffer', 'Offsets', 'Net price', 'Gross Price', 'Cut', 'Sales margin',
          'Gross sales', 'Fossagrim', 'Accum Fossagrim', 'Year', 'Est annual rev', 'Est total rev', 'Sales completion'],

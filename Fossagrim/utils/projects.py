@@ -29,15 +29,14 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
 
 
 def arrange_results(_result_file, _sheet_names, _combine_sheets, _monetization_file, **_kwargs):
+    verbose=True
     # sheet names in the resulting excel file
     write_monetization_file = \
         fio.rearrange_raw_heureka_results(
-            _result_file, _sheet_names, _combine_sheets, monetization_file=_monetization_file)
+            _result_file, _sheet_names, _combine_sheets, monetization_file=_monetization_file, verbose=True)
 
     if write_monetization_file:
         print('Try to modify Monetization file')
-        # TODO
-        # implement this
         fio.modify_monetization_file(_monetization_file, **_kwargs)
 
 
