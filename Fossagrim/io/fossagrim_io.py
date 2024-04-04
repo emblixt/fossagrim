@@ -104,7 +104,7 @@ def read_raw_heureka_results(filename, sheet_name, verbose=False):
     """
     Read heureka results as exported from Heureka (by simply copying a simulation result and pasting it
     into an empty sheet in Excel) and returns the data in a transposed DataFrame with one line for each period (5 years)
-    NOTE, the Variable Treatments:Year must be included in the raw results
+    NOTE, the Variable 'Treatments:Year' must be included in the raw results
 
     :param filename:
     :param sheet_name:
@@ -122,9 +122,11 @@ def read_raw_heureka_results(filename, sheet_name, verbose=False):
     five_years = [np.mod(this_year, 5) == 0 for this_year in table.iloc[year_row, 3:]]
     # print(table.iloc[year_row, 3:][five_years])
     data_dict = {}
+    unit_dict = {}
     for variable in list(table['Variable']):
         row_i = get_row_index(table, 'Variable', variable)
         data_dict[variable] = table.iloc[row_i, 3:][five_years]
+        unit_dict[variable] = table.iloc[row_i, 2]
 
     if verbose:
         qc_plot_dir = os.path.join(os.path.split(filename)[0], 'QC_plots')
@@ -142,7 +144,9 @@ def read_raw_heureka_results(filename, sheet_name, verbose=False):
         # ax.legend()
         # fig.savefig(os.path.join(qc_plot_dir, 'raw_heureka_{}.png'.format(sheet_name)))
 
-    return pd.DataFrame(data=data_dict)
+    result = pd.DataFrame(data=data_dict)
+    result.attrs = unit_dict
+    return result
 
 
 def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetization_file=None, verbose=False):
@@ -629,6 +633,64 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
         )
 
 
+def get_kwargs_from_stand(stand_file, project_settings_file, project_tag):
+    """
+    Extracts necessary information from stand_file and project_settings_file to feed modify_monetization_file()
+    :param stand_file:
+        str
+        Full path name of Fossagrim stand data file (Bestandsutvalg)
+    :param project_settings_file:
+        str
+        Full path name of the project settings Excel sheet.
+    :param project_tag:
+        str
+        Name tag that identifies the current project, e.g. "FHF23-007"
+    :return:
+        dict, list
+        kwargs: Dictionary of kwargs needed by modify_monetization_file()
+        coombine_fractions: list of combination fractions read from the stand_file
+    """
+    p_tabl = read_excel(project_settings_file, 1, 'Settings')
+    i = None
+    # Extract the project settings for the given project
+    for i, p_name in enumerate(p_tabl['Project name']):
+        if not isinstance(p_name, str):
+            continue
+        if project_tag in p_name:
+            break
+
+    combine_positions = [_x.strip() for _x in p_tabl['Position of fractions when combined'][i].split(',')]
+    wb = openpyxl.load_workbook(stand_file, data_only=True)
+    ws = wb.active
+    combine_fractions = [ws[_x].value for _x in combine_positions]
+    _kwarg_position_keys = [
+        'Position of total area',
+        'Position of Flow 1 total volume',
+        'Position of Flow 2 total volume',
+        'Position of passive forest total volume',
+    ]
+    _kwarg_direct_keys = [
+        'Flow 1 start date',
+        'Flow 2 delay',
+        'Root net',
+        'Contract length',
+        'Rent',
+        'Price growth',
+        'Buffer',
+        'Reserve years',
+        'Net price',
+        'Gross price'
+    ]
+    kwargs = {
+        _key: ws[p_tabl[_key][i]].value for _key in _kwarg_position_keys
+    }
+    for _key in _kwarg_direct_keys:
+        kwargs[_key] = p_tabl[_key][i]
+    wb.close()
+
+    return kwargs, combine_fractions
+
+
 def modify_monetization_file(write_to_file, **_kwargs):
     from openpyxl.workbook.defined_name import DefinedName
 
@@ -704,20 +766,21 @@ def style_monetization_file(write_to_file):
     from openpyxl.styles import PatternFill
     from openpyxl.styles import Alignment
     from openpyxl.styles import Font
+    from Fossagrim.utils.definitions import standard_colors as scrs
 
     colors = {
-        'd9e1f2': ['A1:G50'],
-        'f4b084': ['C3:F50'],
-        'f8cbad': ['G3:G50'],
-        'ffc000': ['H1:O50'],
-        'ffd966': ['L2:O50'],
-        'C6E0B4': ['P1:Q50'],
-        'E2EFDA': ['Q2:Q50', 'BD2:BR110'],
-        'BDD7EE': ['R1:W50', 'AN2:AW110'],
-        'DDEBF7': ['U2:W50', 'AC1:AD110'],
-        '9BC2E6': ['Y1:AB110', 'AX2:BC110'],
-        'FCE4D6': ['AE2:AI9'],
-        'FFF2CC': ['AJ1:AM110']
+        scrs['time_1'].replace('#', ''): ['A1:G50'],
+        scrs['products_1'].replace('#', ''): ['C3:F50'],
+        scrs['substitution_1'].replace('#', ''): ['G3:G50'],
+        scrs['bau_1'].replace('#', ''): ['H1:O50'],
+        scrs['bau_2'].replace('#', ''): ['L2:O50'],
+        scrs['project_case_1'].replace('#', ''): ['P1:Q50'],
+        scrs['project_case_2'].replace('#', ''): ['Q2:Q50', 'BD2:BR110'],
+        scrs['climate_benefit_1'].replace('#', ''): ['R1:W50', 'AN2:AW110'],
+        scrs['climate_benefit_2'].replace('#', ''): ['U2:W50', 'AC1:AD110'],
+        scrs['buffer_1'].replace('#', ''): ['Y1:AB110', 'AX2:BC110'],
+        scrs['table_1'].replace('#', ''): ['AE2:AI9'],
+        scrs['cbo_1'].replace('#', ''): ['AJ1:AM110']
     }
 
     # Create named styles
@@ -767,16 +830,22 @@ def style_monetization_file(write_to_file):
     wb.save(write_to_file)
 
 
-def qc_plots(monetization_file):
+def qc_plots(monetization_file, project_tag, plot_dir=None):
+    from Fossagrim.utils.definitions import standard_colors as scrs
+
     wb = openpyxl.load_workbook(monetization_file, data_only=True)
     ws = wb['Monetization']
     annual_climate_benefit_unit = ws['AC4'].value
     accum_climate_benefit_unit = ws['AD4'].value
     resampled_climate_benefit_unit = ws['AA4'].value
     overview_unit = ws['H4'].value
+    contract_length = ws['AN4'].value
     wb.close()
     table = pd.read_excel(monetization_file, sheet_name='Monetization', header=5)
-    qc_plot_dir = os.path.join(os.path.split(monetization_file)[0], 'QC_plots')
+    if plot_dir is None:
+        qc_plot_dir = os.path.join(os.path.split(monetization_file)[0], 'QC_plots')
+    else:
+        qc_plot_dir = plot_dir
 
     def annual_climate_benefit():
         x = table['t.1'].values
@@ -784,15 +853,15 @@ def qc_plots(monetization_file):
         y2 = table['Unnamed: 28'].values
         y3 = table['100 yr contract'].values
         fig, ax = plt.subplots()
-        ax.plot(x, y2, 'y-', label='Climate benefit')
+        ax.plot(x, y2, c=scrs['climate_benefit_0'], label='Climate benefit')
         ax.plot(x, y1, 'b-', label='30 yr contract')
         ax.plot(x, y3, 'b.', label='100 yr contract')
-        ax.set_title('Annual Climate Benefit')
+        ax.set_title('{} Annual Climate Benefit'.format(project_tag))
         ax.set_xlabel('Years')
         ax.set_ylabel(annual_climate_benefit_unit)
         ax.legend()
         ax.grid(True)
-        fig.savefig(os.path.join(qc_plot_dir, 'annual_climate_benefit.png'))
+        fig.savefig(os.path.join(qc_plot_dir, '{} annual_climate_benefit.png'.format(project_tag)))
 
     def accumulated_climate_benefit():
         x = table['t.1'].values
@@ -800,15 +869,15 @@ def qc_plots(monetization_file):
         y2 = table['Unnamed: 29'].values
         y3 = table['100 yr contract.1'].values
         fig, ax = plt.subplots()
-        ax.plot(x, y2, 'y-', label='Climate benefit')
+        ax.plot(x, y2, c=scrs['climate_benefit_0'], label='Climate benefit')
         ax.plot(x, y1, 'b-', label='30 yr contract')
         ax.plot(x, y3, 'b.', label='100 yr contract')
-        ax.set_title('Accumulated Climate Benefit')
+        ax.set_title('{} Accumulated Climate Benefit'.format(project_tag))
         ax.set_xlabel('Years')
         ax.set_ylabel(accum_climate_benefit_unit)
         ax.legend()
         ax.grid(True)
-        fig.savefig(os.path.join(qc_plot_dir, 'accumulated_climate_benefit.png'))
+        fig.savefig(os.path.join(qc_plot_dir, '{} accumulated_climate_benefit.png'.format(project_tag)))
 
     def resampled_climate_benefit():
         x = table['t.1'].values
@@ -817,12 +886,12 @@ def qc_plots(monetization_file):
         fig, ax = plt.subplots()
         ax.plot(x, y2, 'y.', label='Linear intpol / 5yr')
         ax.plot(x, y1, 'b-', label='Running average')
-        ax.set_title('Resampled Climate Benefit')
+        ax.set_title('{} Resampled Climate Benefit'.format(project_tag))
         ax.set_xlabel('Years')
         ax.set_ylabel(resampled_climate_benefit_unit)
         ax.legend()
         ax.grid(True)
-        fig.savefig(os.path.join(qc_plot_dir, 'resampled_climate_benefit.png'))
+        fig.savefig(os.path.join(qc_plot_dir, '{} resampled_climate_benefit.png'.format(project_tag)))
 
     def overview():
         x = table['year'].values
@@ -831,18 +900,51 @@ def qc_plots(monetization_file):
         y3 = table['Unnamed: 8'].values  # Product
         y4 = table['Unnamed: 9'].values  # Substitution
         fig, ax = plt.subplots(figsize=(10, 5))
-        ax.plot(x, y1, label='Base case forest')
-        ax.plot(x, y1 + y3, label='Base case product')
-        ax.plot(x, y1 + y4, label='Base case substitution')
-        ax.plot(x, y2, label='Project case')
-        ax.set_title('Overview')
+        ax.plot(x, y1, c=scrs['bau_1'], label='Base case forest')
+        ax.fill_between(x, y1, color=scrs['bau_1'])
+        ax.plot(x, y1 + y3, c=scrs['products_1'], label='Base case product')
+        ax.fill_between(x, y1 + y3, y1, color=scrs['products_1'])
+        ax.plot(x, y1 + y4, c=scrs['substitution_0'], label='Base case substitution')
+        ax.fill_between(x, y1 + y4, y1 + y3, color=scrs['substitution_0'])
+        ax.plot(x, y2, c=scrs['project_case_0'], label='Project case')
+        ax.set_title('{} Overview'.format(project_tag))
         ax.set_xlabel('Year')
         ax.set_ylabel(overview_unit)
+        ax.set_xlim(np.nanmin(x)-5, np.nanmin(x) + 155)
         ax.legend()
         ax.grid(True)
-        fig.savefig(os.path.join(qc_plot_dir, 'overview.png'))
+        fig.savefig(os.path.join(qc_plot_dir, '{} overview.png'.format(project_tag)))
 
+    def farmed_offsets():
+        x = table['t.1'].values
+        y1 = table['Net farmed offsets / yr'].values
+        y2 = table['Buffer reserved'].values
+        y3 = table['Buffer released'].values
+        y4 = table['Farmed offsets'].values
+        fig, ax = plt.subplots(figsize=(10, 5))
+        data = {
+            'Net farmed offsets': y1,
+            'Buffer reserved': y2,
+            'Buffer released': y3
+        }
+        bottom = np.zeros(len(x))
+        for label, height in data.items():
+            ax.bar(x, height, label=label, bottom=bottom)
+            bottom += height
+        ax.plot(x, y4, label='Farmed offsets')
+        ax.set_title('{} Farmed offsets'.format(project_tag))
+        ax.set_ylabel('Ton')
+        ax.set_xlabel('Time [years]')
+        ax.legend()
+        ax.grid(True)
+        ax.set_xlim(0, contract_length)
+        fig.savefig(os.path.join(qc_plot_dir, '{} farmed_offsets.png'.format(project_tag)))
+
+    # annual_climate_benefit()
+    # accumulated_climate_benefit()
+    # resampled_climate_benefit()
     overview()
+    # farmed_offsets()
 
 
 def test_modify_monetization_file():

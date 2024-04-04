@@ -3,6 +3,28 @@ import pandas as pd
 import datetime
 import numpy as np
 
+standard_colors = {
+    'time_1': '#D9E1F2',
+    'products_0': '#A5A5A5',
+    'products_1': '#D1D1D1',
+    'products_2': '#E8E8E8',
+    'substitution_0': '#ED7D31',
+    'substitution_1': '#F7C5A3',
+    'substitution_2': '#FCE7D8',
+    'bau_0': '#FFC000',
+    'bau_1': '#FFD85B',
+    'bau_2': '#FFEFBD',
+    'project_case_0': '#70AD47',
+    'project_case_1': '#BBDAA6',
+    'project_case_2': '#E0EED6',
+    'climate_benefit_0': '#5B9BD5',
+    'climate_benefit_1': '#A9CBE9',
+    'climate_benefit_2': '#E1EDF7',
+    'table_1': '#FCE4D6',
+    'cbo_1': '#FFF2CC',
+    'buffer_1': '#9BC2E6'
+}
+
 heureka_mandatory_standdata_keys = [
     'StandId',
     'TotalArea',

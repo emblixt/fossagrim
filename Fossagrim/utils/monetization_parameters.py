@@ -4,6 +4,11 @@ import numpy as np
 
 _sep = ','  # ';'
 _dec = '.'  # ','
+# TODO
+# These parameters should be placed in the project_settings_file
+# e.g. 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx'
+# instead of hardcoded here OR? Currently they can be modified in the Monetization file to test various
+# scenarios. If we write them in the project_settings_file then they seem more "eternal"
 parameters = pd.DataFrame([
     ['hpap', 2, 'Half time for paper [yrs]'],
     ['hsawn', 35, 'Half time for sawn products [yrs]'],
