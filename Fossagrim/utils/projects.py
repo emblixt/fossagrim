@@ -98,10 +98,17 @@ def project_settings(_project_tag, _project_settings_file):
         os.makedirs(_qc_folder)
 
     # Create empty results file
+    create_results_file = False
     if os.path.isfile(_result_file):
-        print("WARNING result file {} already exists. No empty result file created".format(
+        print("WARNING result file {} already exists.".format(
             os.path.split(_result_file)[-1]))
+        _ans = input("Do you want to overwrite? Y/[N]:")
+        if _ans.upper() == 'Y':
+            create_results_file = True
     else:
+        create_results_file = True
+
+    if create_results_file:
         writer = pd.ExcelWriter(_result_file, engine='xlsxwriter')
         wb = writer.book
         for _sheet in _result_sheets:

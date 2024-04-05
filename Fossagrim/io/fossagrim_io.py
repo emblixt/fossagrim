@@ -512,7 +512,7 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
 
     number_of_stands_written = 0
     for i, stand_id in enumerate(table[stand_id_key]):
-        if (table['Bonitering\ntreslag'][i] in ['Uproduktiv', '-']) or np.isnan(table['HovedNr'][i]):
+        if table['Bonitering\ntreslag'][i] in ['Uproduktiv', '-']:  # or np.isnan(table['HovedNr'][i]):
             if verbose:
                 print('Skipping stand {}'.format(stand_id))
             continue
@@ -599,7 +599,7 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
                  for _key in list(average_over.keys())]
 
     for i, stand_id in enumerate(table[stand_id_key]):
-        if (table['Bonitering\ntreslag'][i] in ['Uproduktiv', '-']) or np.isnan(table['HovedNr'][i]):
+        if (table['Bonitering\ntreslag'][i] in ['Uproduktiv', '-']): # or np.isnan(table['HovedNr'][i]):
             continue
         if (this_stand_only is not None) and (this_stand_only != stand_id):
             continue
