@@ -3,6 +3,8 @@ import pandas as pd
 import datetime
 import numpy as np
 
+m3fub_to_m3sk = 1.19
+
 standard_colors = {
     'time_1': '#D9E1F2',
     'products_0': '#A5A5A5',

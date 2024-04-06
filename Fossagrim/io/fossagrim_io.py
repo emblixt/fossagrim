@@ -100,7 +100,7 @@ def write_csv_file(write_to_file, default_keys, default_desc, append=False, **kw
             f.write(';'.join(data)+'\n')
 
 
-def read_raw_heureka_results(filename, sheet_name, verbose=False):
+def read_raw_heureka_results(filename, sheet_name, read_only_these_variables=None, verbose=False):
     """
     Read heureka results as exported from Heureka (by simply copying a simulation result and pasting it
     into an empty sheet in Excel) and returns the data in a transposed DataFrame with one line for each period (5 years)
@@ -108,6 +108,9 @@ def read_raw_heureka_results(filename, sheet_name, verbose=False):
 
     :param filename:
     :param sheet_name:
+    :param read_only_these_variables:
+       list
+       If provided, read_raw_heureka_results will only read the variables (given by name) contained in this list
     :param verbose:
         bool
         creates qc plot(s)
@@ -124,6 +127,10 @@ def read_raw_heureka_results(filename, sheet_name, verbose=False):
     data_dict = {}
     unit_dict = {}
     for variable in list(table['Variable']):
+        if read_only_these_variables is not None:
+            if variable not in read_only_these_variables:
+                continue
+        print(variable)
         row_i = get_row_index(table, 'Variable', variable)
         data_dict[variable] = table.iloc[row_i, 3:][five_years]
         unit_dict[variable] = table.iloc[row_i, 2]
@@ -178,9 +185,15 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
     write_monetization_file = False
     if monetization_file is not None:
         if os.path.isfile(monetization_file):
-            print("WARNING monetization file {} already exists. No empty file created".format(
+            print("WARNING monetization file {} already exists.".format(
                 os.path.split(monetization_file)[-1]))
+            _ans = input("Do you want to overwrite? Y/[N]:")
+            if _ans.upper() == 'Y':
+                write_monetization_file = True
         else:
+            write_monetization_file = True
+
+        if write_monetization_file:
             # Create empty monetization file
             writer = pd.ExcelWriter(monetization_file, engine='xlsxwriter')
             wb = writer.book
@@ -191,6 +204,8 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
 
     start_cols = []
     for i, sheet_name in enumerate(sheet_names):
+        # TODO
+        # Make use of the new possibility to select which variables to read
         table = read_raw_heureka_results(filename, sheet_name, verbose=verbose)
         this_start_col = i * (len(list(table.keys())) + 2)
         with pd.ExcelWriter(filename, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
@@ -947,6 +962,13 @@ def qc_plots(monetization_file, project_tag, plot_dir=None):
     # farmed_offsets()
 
 
+def test_read_raw_heureka_results():
+    file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Heureka results.xlsx"
+    sheet_name = 'FHF23-999 Avg Stand-Pine PRES'
+    result = read_raw_heureka_results(file, sheet_name, ['Soil Carbon Stock', 'Year'], False)
+    print(result)
+
+
 def test_modify_monetization_file():
     mf = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\XXX"
     modify_monetization_file(mf)
@@ -1059,4 +1081,5 @@ if __name__ == '__main__':
     # test_export_fossagrim_stand()
     # test_export_fossagrim_treatment()
     # test_write_excel_with_equations()
-    test_modify_monetization_file()
+    # test_modify_monetization_file()
+    test_read_raw_heureka_results()

@@ -172,14 +172,14 @@ if __name__ == '__main__':
 
     # Set to False after Heureka simulation results have been saved in result_file, and you want to
     # rearrange the results so that they are easier to include in Excel calculations
-    fix_import = True
+    fix_import = False
 
     verbose = True
 
     # For some reason, I need to open the Monetization file in Excel, and save it, before Python can
     # read it and create QC plots
     # So set this to True after opening and saving the Monetization file,
-    monetization_file_has_been_opened_and_saved = True
+    monetization_file_has_been_opened_and_saved = False
 
     project_folder, stand_file, average_over, stand_id_key, result_file, result_sheets, combine_sheets, \
         monetization_file, csv_stand_file, csv_treatment_file, kwargs = \
