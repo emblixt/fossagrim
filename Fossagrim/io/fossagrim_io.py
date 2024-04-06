@@ -7,7 +7,7 @@ import os
 from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, \
     heureka_standdata_keys, heureka_standdata_desc, \
     heureka_treatment_keys, heureka_treatment_desc, \
-    fossagrim_standdata_keys, \
+    fossagrim_standdata_keys, m3fub_to_m3sk,\
     translate_keys_from_fossagrim_to_heureka
 from Fossagrim.utils.monetization_parameters import \
     parameters, calculation_part1, resampled_section,\
@@ -337,7 +337,7 @@ def arrange_export_of_one_stand(row_index, table):
             else:
                 raise NotImplementedError('Species "{}" is not recognized as either Gran or Furu'.format(value))
         if key == 'V':
-            keyword_arguments[key] = value * 10.  # m3/daa to m3/ha
+            keyword_arguments[key] = value * 10. * m3fub_to_m3sk # m3fub/daa to m3sk/ha
         if key == 'N':
             keyword_arguments[key] = value * 10.  # trees/mål to trees/ha
         if key == 'PlantDensity':
