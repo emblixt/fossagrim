@@ -706,6 +706,65 @@ def get_kwargs_from_stand(stand_file, project_settings_file, project_tag):
     return kwargs, combine_fractions
 
 
+def get_kwargs_from_stand_NEW(stand_file, project_settings_file, project_tag):
+    """
+    Extracts necessary information from stand_file and project_settings_file to feed modify_monetization_file()
+    :param stand_file:
+        str
+        Full path name of Fossagrim stand data file (Bestandsutvalg)
+    :param project_settings_file:
+        str
+        Full path name of the project settings Excel sheet.
+    :param project_tag:
+        str
+        Name tag that identifies the current project, e.g. "FHF23-007"
+    :return:
+        dict, list
+        kwargs: Dictionary of kwargs needed by modify_monetization_file()
+        combine_fractions: list of combination fractions read from the stand_file
+    """
+    p_tabl = read_excel(project_settings_file, 1, 'Settings')
+    i = None
+    # Extract the project settings for the given project
+    for i, p_name in enumerate(p_tabl['Project name']):
+        if not isinstance(p_name, str):
+            continue
+        if project_tag in p_name:
+            break
+
+    combine_positions = [_x.strip() for _x in p_tabl['Position of fractions when combined'][i].split(',')]
+    wb = openpyxl.load_workbook(stand_file, data_only=True)
+    ws = wb.active
+    combine_fractions = [ws[_x].value for _x in combine_positions]
+    _kwarg_position_keys = [
+        'Position of total area',
+        'Position of Flow 1 total volume',
+        'Position of Flow 2 total volume',
+        'Position of passive forest total volume',
+    ]
+    _kwarg_direct_keys = [
+        'Flow 1 start date',
+        'Flow 2 delay',
+        'Root net',
+        'Contract length',
+        'Rent',
+        'Price growth',
+        'Buffer',
+        'Reserve years',
+        'Net price',
+        'Gross price',
+        'NIBOR 10yr'
+    ]
+    kwargs = {
+        _key: ws[p_tabl[_key][i]].value for _key in _kwarg_position_keys
+    }
+    for _key in _kwarg_direct_keys:
+        kwargs[_key] = p_tabl[_key][i]
+    wb.close()
+
+    return kwargs, combine_fractions
+
+
 def modify_monetization_file(write_to_file, **_kwargs):
     from openpyxl.workbook.defined_name import DefinedName
 
@@ -1087,10 +1146,23 @@ def test_export_fossagrim_treatment():
     #                            this_stand_only=67)
 
 
+def test_get_kwargs_from_stand():
+    kwargs, combine_fractions = get_kwargs_from_stand_NEW(
+        "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Bestandsutvalg.xlsx",
+        "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings – WIP.xlsx",
+        "FHF23-999"
+    )
+    for _key in kwargs:
+        print(_key, ':', kwargs[_key])
+    print('-x-')
+    print(combine_fractions)
+
+
 if __name__ == '__main__':
     # test_rearrange()
     # test_export_fossagrim_stand()
     # test_export_fossagrim_treatment()
     # test_write_excel_with_equations()
     # test_modify_monetization_file()
-    test_read_raw_heureka_results()
+    # test_read_raw_heureka_results()
+    test_get_kwargs_from_stand()
