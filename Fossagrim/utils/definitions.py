@@ -27,6 +27,50 @@ standard_colors = {
     'buffer_1': '#9BC2E6'
 }
 
+standard_linestyles = {
+    'time_1': '-',
+    'products_0': '--',
+    'products_1': '--',
+    'products_2': '--',
+    'substitution_0': ':',
+    'substitution_1': ':',
+    'substitution_2': ':',
+    'bau_0': '-',
+    'bau_1': '-',
+    'bau_2': '-',
+    'project_case_0': '-.',
+    'project_case_1': '-.',
+    'project_case_2': '-.',
+    'climate_benefit_0': '-',
+    'climate_benefit_1': '-',
+    'climate_benefit_2': '-',
+    'table_1': '-',
+    'cbo_1': '-',
+    'buffer_1': '-'
+}
+
+standard_linewidths = {
+    'time_1': 1,
+    'products_0': 2,
+    'products_1': 1,
+    'products_2': 0.5,
+    'substitution_0': 2,
+    'substitution_1': 1,
+    'substitution_2': 0.5,
+    'bau_0': 2,
+    'bau_1': 1,
+    'bau_2': 0.5,
+    'project_case_0': 2,
+    'project_case_1': 1,
+    'project_case_2': 0.5,
+    'climate_benefit_0': 2,
+    'climate_benefit_1': 1,
+    'climate_benefit_2': 0.5,
+    'table_1': 1,
+    'cbo_1': 1,
+    'buffer_1': 1
+}
+
 heureka_mandatory_standdata_keys = [
     'StandId',
     'TotalArea',

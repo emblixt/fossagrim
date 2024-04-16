@@ -10,7 +10,7 @@ from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, \
     fossagrim_standdata_keys, m3fub_to_m3sk,\
     translate_keys_from_fossagrim_to_heureka
 from Fossagrim.utils.monetization_parameters import \
-    parameters, calculation_part1, resampled_section,\
+    parameters, variables_used_in_monetization, calculation_part1, resampled_section,\
     money_value, cbo_flow, project_benefits, buffer, values
 
 import Fossagrim.plotting.misc_plots as fpp
@@ -130,7 +130,6 @@ def read_raw_heureka_results(filename, sheet_name, read_only_these_variables=Non
         if read_only_these_variables is not None:
             if variable not in read_only_these_variables:
                 continue
-        print(variable)
         row_i = get_row_index(table, 'Variable', variable)
         data_dict[variable] = table.iloc[row_i, 3:][five_years]
         unit_dict[variable] = table.iloc[row_i, 2]
@@ -200,13 +199,14 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
             for _sheet in [result_sheet_name, 'Parameters', 'Monetization']:
                 ws = wb.add_worksheet(_sheet)
             writer.close()
-            write_monetization_file = True
 
     start_cols = []
     for i, sheet_name in enumerate(sheet_names):
-        # TODO
-        # Make use of the new possibility to select which variables to read
-        table = read_raw_heureka_results(filename, sheet_name, verbose=verbose)
+        table = read_raw_heureka_results(
+            filename,
+            sheet_name,
+            read_only_these_variables=variables_used_in_monetization,
+            verbose=verbose)
         this_start_col = i * (len(list(table.keys())) + 2)
         with pd.ExcelWriter(filename, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
             table.to_excel(writer, sheet_name=result_sheet_name, startcol=this_start_col, startrow=2)
@@ -230,7 +230,7 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
                     # On position 1, 3, 5, ... the fractions are stored
                     fractions.append(sheet_name)
                     continue
-                tables.append(read_raw_heureka_results(filename, sheet_name))
+                tables.append(read_raw_heureka_results(filename, sheet_name, variables_used_in_monetization))
             combined_dict = {}
             for key in list(tables[0].keys()):
                 if key == 'Treatment':
@@ -847,6 +847,8 @@ def style_monetization_file(write_to_file):
 
 def qc_plots(monetization_file, project_tag, plot_dir=None):
     from Fossagrim.utils.definitions import standard_colors as scrs
+    from Fossagrim.utils.definitions import standard_linestyles as sls
+    from Fossagrim.utils.definitions import standard_linewidths as slw
 
     wb = openpyxl.load_workbook(monetization_file, data_only=True)
     ws = wb['Monetization']
@@ -868,7 +870,10 @@ def qc_plots(monetization_file, project_tag, plot_dir=None):
         y2 = table['Unnamed: 28'].values
         y3 = table['100 yr contract'].values
         fig, ax = plt.subplots()
-        ax.plot(x, y2, c=scrs['climate_benefit_0'], label='Climate benefit')
+        ax.plot(x, y2, c=scrs['climate_benefit_0'],
+                linestyle=sls['climate_benefit_0'],
+                linewidth=slw['climate_benefit_0'],
+                label='Climate benefit')
         ax.plot(x, y1, 'b-', label='30 yr contract')
         ax.plot(x, y3, 'b.', label='100 yr contract')
         ax.set_title('{} Annual Climate Benefit'.format(project_tag))
@@ -884,7 +889,10 @@ def qc_plots(monetization_file, project_tag, plot_dir=None):
         y2 = table['Unnamed: 29'].values
         y3 = table['100 yr contract.1'].values
         fig, ax = plt.subplots()
-        ax.plot(x, y2, c=scrs['climate_benefit_0'], label='Climate benefit')
+        ax.plot(x, y2, c=scrs['climate_benefit_0'],
+                linestyle=sls['climate_benefit_0'],
+                linewidth=slw['climate_benefit_0'],
+                label='Climate benefit')
         ax.plot(x, y1, 'b-', label='30 yr contract')
         ax.plot(x, y3, 'b.', label='100 yr contract')
         ax.set_title('{} Accumulated Climate Benefit'.format(project_tag))
@@ -912,8 +920,11 @@ def qc_plots(monetization_file, project_tag, plot_dir=None):
         x = table['year'].values
         y1 = table['COPY OVER!.1'].values  # Base case
         y2 = table['COPY OVER!.2'].values  # Project case
-        y3 = table['Unnamed: 8'].values  # Product
-        y4 = table['Unnamed: 9'].values  # Substitution
+        _y3 = table['Unnamed: 8'].values  # Product
+        _y4 = table['Unnamed: 9'].values  # Substitution
+        # shift the Product and Substitution arrays, and skip the last element
+        y3 = np.insert(np.array([0.]), 1, _y3[:-1], axis=0)
+        y4 = np.insert(np.array([0.]), 1, _y4[:-1], axis=0)
         fig, ax = plt.subplots(figsize=(10, 5))
         ax.plot(x, y1, c=scrs['bau_1'], label='Base case forest')
         ax.fill_between(x, y1, color=scrs['bau_1'])
@@ -965,7 +976,7 @@ def qc_plots(monetization_file, project_tag, plot_dir=None):
 def test_read_raw_heureka_results():
     file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Heureka results.xlsx"
     sheet_name = 'FHF23-999 Avg Stand-Pine PRES'
-    result = read_raw_heureka_results(file, sheet_name, ['Soil Carbon Stock', 'Year'], False)
+    result = read_raw_heureka_results(file, sheet_name, variables_used_in_monetization, False)
     print(result)
 
 

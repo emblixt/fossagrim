@@ -22,6 +22,18 @@ parameters = pd.DataFrame([
     ['k', '0{}21'.format(_dec), 'Omvandlingsfaktor m3sk till ton C']
 ])
 
+variables_used_in_monetization = [
+    'Soil Carbon Stock',
+    'Total Carbon Deadwood',
+    'Total Carbon Living Stumps and Roots',
+    'Total Carbon Living Trees (excl. stump and roots)',
+    'Total Carbon Stock (dead wood, soil, trees, stumps and roots)',
+    'Total Extracted Volume Fub (m³fub)',
+    'Mean Age (all trees, always basal area weighted) Before',
+    'Treatment',
+    'Year'
+]
+
 calculation_part1_header = pd.DataFrame([
     ['Sheet updated', datetime.date.today().isoformat(), '', 'Productive, active area, ha', '', 0, '',
      'Base case pools, ton CO2', '', '', '', '', '', '', '', 'Project case pools, ton CO2', '',

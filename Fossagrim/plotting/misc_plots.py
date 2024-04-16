@@ -79,10 +79,23 @@ def plot_plant_density():
 def plot_raw_data(data_dict, data_tag, my_title, qc_plot_dir):
     fig, ax = plt.subplots(figsize=(12, 12))
     _x = data_dict['Year']
+    _count = 0
+    _lw = 1
+    _ls = '-'
     for key, _y in data_dict.items():
+        if np.mod(_count, 3) == 0:
+            _lw = 2
+            _ls = '--'
+        elif np.mod(_count, 3) == 1:
+            _lw = 1
+            _ls = '-'
+        elif np.mod(_count, 3) == 2:
+            _lw = 2
+            _ls = ':'
         if key in ['Year', 'Treatment', 'Unit']:
             continue
-        ax.plot(_x, _y, label=key)
+        ax.plot(_x, _y, linewidth=_lw, linestyle=_ls, label=key)
+        _count += 1
     ax.set_title('{} {}'.format(my_title, data_tag))
     ax.set_xlabel('Year')
     ax.grid(True)

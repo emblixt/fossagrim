@@ -179,7 +179,7 @@ if __name__ == '__main__':
     # For some reason, I need to open the Monetization file in Excel, and save it, before Python can
     # read it and create QC plots
     # So set this to True after opening and saving the Monetization file,
-    monetization_file_has_been_opened_and_saved = False
+    monetization_file_has_been_opened_and_saved = True
 
     project_folder, stand_file, average_over, stand_id_key, result_file, result_sheets, combine_sheets, \
         monetization_file, csv_stand_file, csv_treatment_file, kwargs = \
