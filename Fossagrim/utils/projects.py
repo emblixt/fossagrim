@@ -115,34 +115,8 @@ def project_settings(_project_tag, _project_settings_file):
             _ = wb.add_worksheet(_sheet)
         writer.close()
 
-    # combine_positions = [_x.strip() for _x in p_tabl['Position of fractions when combined'][i].split(',')]
-    # wb = openpyxl.load_workbook(_stand_file, data_only=True)
-    # ws = wb.active
-    # combine_fractions = [ws[_x].value for _x in combine_positions]
-    # _kwarg_position_keys = [
-    #     'Position of total area',
-    #     'Position of Flow 1 total volume',
-    #     'Position of Flow 2 total volume',
-    #     'Position of passive forest total volume',
-    # ]
-    # _kwarg_direct_keys = [
-    #     'Flow 1 start date',
-    #     'Flow 2 delay',
-    #     'Root net',
-    #     'Contract length',
-    #     'Rent',
-    #     'Price growth',
-    #     'Buffer',
-    #     'Reserve years',
-    #     'Net price',
-    #     'Gross price'
-    # ]
-    # _kwargs = {
-    #     _key: ws[p_tabl[_key][i]].value for _key in _kwarg_position_keys
-    # }
-    # for _key in _kwarg_direct_keys:
-    #     _kwargs[_key] = p_tabl[_key][i]
-    # wb.close()
+    # XXX testing
+    # _kwargs, combine_fractions = fio.get_kwargs_from_stand(_stand_file, _project_settings_file, _project_tag)
     _kwargs, combine_fractions = fio.get_kwargs_from_stand(_stand_file, _project_settings_file, _project_tag)
 
     _combine_sheets = {}
@@ -176,10 +150,10 @@ if __name__ == '__main__':
 
     verbose = True
 
-    # For some reason, I need to open the Monetization file in Excel, and save it, before Python can
-    # read it and create QC plots
+    # You need to open the Monetization file in Excel, open "Manage Workbook Links", point to the correct
+    # "ProjectForestSettings" file, and save it, before Python can read it and create QC plots
     # So set this to True after opening and saving the Monetization file,
-    monetization_file_has_been_opened_and_saved = True
+    monetization_file_has_been_opened_and_saved = False
 
     project_folder, stand_file, average_over, stand_id_key, result_file, result_sheets, combine_sheets, \
         monetization_file, csv_stand_file, csv_treatment_file, kwargs = \

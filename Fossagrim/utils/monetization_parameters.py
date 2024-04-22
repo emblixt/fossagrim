@@ -34,6 +34,7 @@ variables_used_in_monetization = [
     'Year'
 ]
 
+#  Calculation part 1 of Monatization file, Columns A to (including) W
 calculation_part1_header = pd.DataFrame([
     ['Sheet updated', datetime.date.today().isoformat(), '', 'Productive, active area, ha', '', 0, '',
      'Base case pools, ton CO2', '', '', '', '', '', '', '', 'Project case pools, ton CO2', '',
@@ -88,6 +89,7 @@ calculation_part1 = pd.concat([
  ], ignore_index=True)
 
 
+#  Resampled section of Monatization file, Columns Y to (including) AD
 resampled_section = pd.concat(
 [
         pd.DataFrame([
@@ -112,6 +114,8 @@ resampled_section = pd.concat(
 resampled_section.iloc[7, 3] = '{} + (AB10-AB12)'.format(resampled_section.iloc[7, 3])
 resampled_section.iloc[8, 3] = '{} + (AB10-AB11)'.format(resampled_section.iloc[8, 3])
 
+
+# Monetary value section, Columns AE to (including) AI
 money_value = pd.DataFrame([
     ['', 'Flow1', 'Flow2', 'Total Flow', 'Max potential'],
     ['Volume, m3', 0, 0, '=AF3+AG3',  ''],
@@ -123,6 +127,8 @@ money_value = pd.DataFrame([
     ['Root net total, kr', '=AF3*AF8', '=AG3*AG8', '=AH3*AH8', '=AI3*AI8']
 ])
 
+
+#  Divide climate benefits into flows, columns AJ to (including) AM
 cbo_flow = pd.concat([
     pd.DataFrame([
         ['', 'CBO Flow 1', 'CBO Flow 2', 'Project flow'],
@@ -139,6 +145,8 @@ cbo_flow = pd.concat([
          ] for _row in np.arange(103)])
 ], ignore_index=True)
 
+
+# Project benefits, columns AN to (including) AW
 project_benefits = pd.concat([
     pd.DataFrame([
         ['Project Benefits - rental contracts', '', '', '', '', '', '', '', '', ''],
@@ -168,6 +176,8 @@ project_benefits = pd.concat([
         ] for _row in np.arange(103)])
 ], ignore_index=True)
 
+
+# Project buffer, columns AX to (including) BC
 buffer = pd.concat([
     pd.DataFrame([
         ['Buffer', 'Reserve years', 'Release years', 'Total release + new', 'Tonyears', 'Gradient'],
@@ -190,20 +200,20 @@ buffer = pd.concat([
         ] for _row in np.arange(103)])
 ], ignore_index=True)
 
-# TODO
-# This section causes problem in excel!
-values = pd.concat([
+
+# Section for Fossagrim cash flow, columns BD to (including) BN
+fossagrim_values = pd.concat([
     pd.DataFrame([
-        ['', '', '', 'Ref price', '=AH9/SUM(BG8:BG78)', '', '', '', '', '', '', '', '', '', ''],
-        ['', '', '', '', '', '', '', '', '', 'Mark-up / handling fee', '', '', '', '', ''],
-        ['', '', '', 'Sales', '', '', '', '', '', '=(BI8-BH8)/BH8', '', '', '', '', ''],
+        ['', '', '', 'Ref price', '=AH9/SUM(BG8:BG78)', '', '', '', 'Mark-up / handling fee', '=(BI8-BH8)/BH8', ''],
+        ['', '', '', '', '', '', '', '', '', '', ''],
+        ['', '', '', 'Sales', '', '', '', '', '', '', ''],
         ['', '', '', '', 'Forest Owner', 'Total', 'Fossagrim', '', '',
          '=CONCATENATE(\"Annual revenue at \"{}BI8{}\"kr/ton\")'.format(_sep, _sep),
-         'Total revenue', '', 'Forest owner', '', ''],
+         'Total revenue'],
         ['Year', 'Project Benefit', 'Buffer', 'Offsets', 'Net price', 'Gross Price', 'Cut', 'Sales margin',
-         'Gross sales', 'Fossagrim', 'Accum Fossagrim', 'Year', 'Est annual rev', 'Est total rev', 'Sales completion'],
-        ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
-        ]),
+         'Gross sales', 'Fossagrim', 'Accum Fossagrim'],
+        ['', '', '', '', '', '', '', '', '', '', '']
+    ]),
     pd.DataFrame([
         [
             '=Y{}+1'.format(_row+8),
@@ -211,15 +221,34 @@ values = pd.concat([
             '=IF(AX{}{}-AX{}{}BA{})'.format(_row+8, _sep, _row+8, _sep, _row+8),
             '=AP{}-AX{}+BA{}'.format(_row+8, _row+8, _row+8),
             '=IF(BG{}>0{}BH{}{})'.format(_row+8, _sep, _row+7, _sep),
-            '=BH{}*(1+$BM$4)'.format(_row+8),
+            '=BH{}*(1+$BM$2)'.format(_row+8),
             '=BI{}-BH{}'.format(_row+8, _row+8),
             '=IF(BI{}{}BJ{}/BI{}{})'.format(_row+8, _sep, _row+8, _row+8, _sep),
             '=BI{}*$BG{}'.format(_row+8, _row+8),
             '=BG{}*$BJ{}'.format(_row+8, _row+8),
-            '=IF(AN{}>0{}SUM(BM$8:BM{}){})'.format(_row+8, _sep, _row+8, _sep),
-            '=BD{}'.format(_row + 8),
+            '=IF(AN{}>0{}SUM(BM$8:BM{}){})'.format(_row+8, _sep, _row+8, _sep)
+        ] for _row in np.arange(103)])
+], ignore_index=True)
+
+forest_owner_values = pd.concat([
+    pd.DataFrame([
+        # ['', '', '', '', '', ''],
+        ['Forest owner', '', '', '', '', ''],
+        ['10 year interest rate', '', 'Base case', 'Project case', '', ''],
+        ['Min. net price [kr/ton CO2]',
+         '=$BQ$7/($BG$8 + NPV($BP$3{} $BG$9:$BG$50))'.format(_sep),
+         '', '', '', ''],
+        ['Net price [kr/ton CO2]', '=$BH$8', '', '', '', ''],
+        ['Year', '', 'Est annual rev', 'Est annual rev', 'Est total rev', 'Sales completion'],
+        ['', 'NPV of total:', '=BQ8+NPV($BP$3{} BQ9:BQ37)'.format(_sep), '=BR8+NPV($BP$3{} BR9:BR37)'.format(_sep), '', '']
+        ]),
+    pd.DataFrame([
+        [
+            '=Y{}+1'.format(_row+8),
+            '',
+            '=IF(ROW()=8{} $AF$3*$AF$8{} IF(ROW()-7=$AG$6{} $AG$3*$AG$8{} 0))'.format(_sep,_sep,_sep,_sep),
             '=BL{}-BM{}'.format(_row + 8, _row + 8),
-            '=IF(AO{}>0{}SUM(BP$8:BP{}){})'.format(_row + 8, _sep, _row + 8, _sep),
-            '=SUM(BP$8:BP{})/SUM(BP$8:BP$78)'.format(_row+8)
+            '=IF(AO{}>0{}SUM(BR$8:BR{}){})'.format(_row + 8, _sep, _row + 8, _sep),
+            '=SUM(BR$8:BR{})/SUM(BR$8:BR$78)'.format(_row+8)
         ] for _row in np.arange(103)])
 ], ignore_index=True)

@@ -11,7 +11,7 @@ from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, \
     translate_keys_from_fossagrim_to_heureka
 from Fossagrim.utils.monetization_parameters import \
     parameters, variables_used_in_monetization, calculation_part1, resampled_section,\
-    money_value, cbo_flow, project_benefits, buffer, values
+    money_value, cbo_flow, project_benefits, buffer, fossagrim_values, forest_owner_values
 
 import Fossagrim.plotting.misc_plots as fpp
 
@@ -159,6 +159,8 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
     """
 
     :param filename:
+        str
+        Name of file with Heureka results
     :param sheet_names:
         list
         List of strings with names of sheets that contains raw results from different Heureka simulations
@@ -181,6 +183,21 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
     from openpyxl import load_workbook
 
     result_sheet_name = 'Rearranged results'
+
+    rearrange_result_file = False
+
+    # Test if the excel file with Heureka results already contain Rearranged results
+    wb = load_workbook(filename)
+    if result_sheet_name in wb.sheetnames:
+        print("WARNING the sheet '{}' already exists in {}.".format(
+            result_sheet_name,
+            os.path.basename(filename)))
+        _ans = input("Do you want to overwrite that sheet? Y/[N]:")
+        if _ans.upper() == 'Y':
+            rearrange_result_file = True
+    else:
+        rearrange_result_file = True
+
     write_monetization_file = False
     if monetization_file is not None:
         if os.path.isfile(monetization_file):
@@ -208,15 +225,17 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
             read_only_these_variables=variables_used_in_monetization,
             verbose=verbose)
         this_start_col = i * (len(list(table.keys())) + 2)
-        with pd.ExcelWriter(filename, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
-            table.to_excel(writer, sheet_name=result_sheet_name, startcol=this_start_col, startrow=2)
+        if rearrange_result_file:
+            with pd.ExcelWriter(filename, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
+                table.to_excel(writer, sheet_name=result_sheet_name, startcol=this_start_col, startrow=2)
         start_cols.append(this_start_col)
 
-    wb = load_workbook(filename)
-    ws = wb[result_sheet_name]
-    for i, header in enumerate(sheet_names):
-        ws.cell(1, start_cols[i] + 1).value = header
-    wb.save(filename)
+    if rearrange_result_file:
+        wb = load_workbook(filename)
+        ws = wb[result_sheet_name]
+        for i, header in enumerate(sheet_names):
+            ws.cell(1, start_cols[i] + 1).value = header
+        wb.save(filename)
 
     if combine_sheets is not None:
         last_start_col = start_cols[-1]
@@ -245,13 +264,15 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
 
             # Start writing the combined table
             this_start_col = last_start_col + (i + 1) * (len(list(combined_table.keys())) + 2)
-            with pd.ExcelWriter(filename, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
-                combined_table.to_excel(writer, sheet_name=result_sheet_name, startcol=this_start_col, startrow=2)
+            if rearrange_result_file:
+                with pd.ExcelWriter(filename, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
+                    combined_table.to_excel(writer, sheet_name=result_sheet_name, startcol=this_start_col, startrow=2)
 
-            wb = load_workbook(filename)
-            ws = wb[result_sheet_name]
-            ws.cell(1, this_start_col + 1).value = this_combined_result
-            wb.save(filename)
+            if rearrange_result_file:
+                wb = load_workbook(filename)
+                ws = wb[result_sheet_name]
+                ws.cell(1, this_start_col + 1).value = this_combined_result
+                wb.save(filename)
 
             if write_monetization_file:
                 _start_col = 0 + (i + 0) * (len(list(combined_table.keys())) + 2)
@@ -648,7 +669,7 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
         )
 
 
-def get_kwargs_from_stand(stand_file, project_settings_file, project_tag):
+def get_kwargs_from_stand_OLD(stand_file, project_settings_file, project_tag):
     """
     Extracts necessary information from stand_file and project_settings_file to feed modify_monetization_file()
     :param stand_file:
@@ -706,7 +727,7 @@ def get_kwargs_from_stand(stand_file, project_settings_file, project_tag):
     return kwargs, combine_fractions
 
 
-def get_kwargs_from_stand_NEW(stand_file, project_settings_file, project_tag):
+def get_kwargs_from_stand(stand_file, project_settings_file, project_tag):
     """
     Extracts necessary information from stand_file and project_settings_file to feed modify_monetization_file()
     :param stand_file:
@@ -742,24 +763,30 @@ def get_kwargs_from_stand_NEW(stand_file, project_settings_file, project_tag):
         'Position of Flow 2 total volume',
         'Position of passive forest total volume',
     ]
-    _kwarg_direct_keys = [
-        'Flow 1 start date',
-        'Flow 2 delay',
-        'Root net',
-        'Contract length',
-        'Rent',
-        'Price growth',
-        'Buffer',
-        'Reserve years',
-        'Net price',
-        'Gross price',
-        'NIBOR 10yr'
-    ]
+    _kwarg_direct_keys = {
+        'Flow 1 start date': 'J',
+        'Flow 2 delay': 'L',
+        'Root net': 'N',
+        'Contract length': 'O',
+        'Rent': 'P',
+        'Price growth': 'Q',
+        'Buffer': 'R',
+        'Reserve years': 'S',
+        'Net price': 'T',
+        'Gross price': 'U',
+        'NIBOR 10yr': 'V'
+    }
     kwargs = {
         _key: ws[p_tabl[_key][i]].value for _key in _kwarg_position_keys
     }
-    for _key in _kwarg_direct_keys:
-        kwargs[_key] = p_tabl[_key][i]
+    for _key in list(_kwarg_direct_keys.keys()):
+        # kwargs[_key] = "='C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\[ProjectForestsSettings – WIP.xlsx]Settings'!${}${}".format(
+        #     _kwarg_direct_keys[_key], i+3)  # +3 because 2 header lines and python starts counting at 0
+        # Using the absolut path makes the linking works easier, but makes it difficult to share the file
+        # UPDATE! If I open the linked file (ProjectForestSettings - WIP.xlsx) the linking works:-)
+        kwargs[_key] = "='[{}]Settings'!${}${}".format(
+            os.path.basename(project_settings_file),
+            _kwarg_direct_keys[_key], i+3)  # +3 because 2 header lines and python starts counting at 0
     wb.close()
 
     return kwargs, combine_fractions
@@ -783,8 +810,10 @@ def modify_monetization_file(write_to_file, **_kwargs):
             writer, sheet_name='Monetization', startcol=39, startrow=1, index=False, header=False)
         buffer.to_excel(
             writer, sheet_name='Monetization', startcol=49, startrow=2, index=False, header=False)
-        values.to_excel(
+        fossagrim_values.to_excel(
             writer, sheet_name='Monetization', startcol=55, startrow=1, index=False, header=False)
+        forest_owner_values.to_excel(
+            writer, sheet_name='Monetization', startcol=66, startrow=1, index=False, header=False)
 
     # Modify monetization file with constants kwargs
     wb = openpyxl.load_workbook(write_to_file)
@@ -805,6 +834,7 @@ def modify_monetization_file(write_to_file, **_kwargs):
     ws['AY4'].value = _kwargs['Reserve years']
     ws['BH8'].value = _kwargs['Net price']
     ws['BI8'].value = _kwargs['Gross price']
+    ws['BP3'].value = _kwargs['NIBOR 10yr']
 
     wb.save(write_to_file)
 
@@ -848,8 +878,8 @@ def style_monetization_file(write_to_file):
         scrs['substitution_1'].replace('#', ''): ['G3:G50'],
         scrs['bau_1'].replace('#', ''): ['H1:O50'],
         scrs['bau_2'].replace('#', ''): ['L2:O50'],
-        scrs['project_case_1'].replace('#', ''): ['P1:Q50'],
-        scrs['project_case_2'].replace('#', ''): ['Q2:Q50', 'BD2:BR110'],
+        scrs['project_case_1'].replace('#', ''): ['P1:Q50', 'BO2:BT110'],
+        scrs['project_case_2'].replace('#', ''): ['Q2:Q50', 'BD2:BN110'],
         scrs['climate_benefit_1'].replace('#', ''): ['R1:W50', 'AN2:AW110'],
         scrs['climate_benefit_2'].replace('#', ''): ['U2:W50', 'AC1:AD110'],
         scrs['buffer_1'].replace('#', ''): ['Y1:AB110', 'AX2:BC110'],
@@ -874,32 +904,42 @@ def style_monetization_file(write_to_file):
 
     for _pos in ['AF5', 'AG5', 'AK4', 'AL4']:
         ws[_pos].style = 'date_style'
-    for _pos in ['AF4', 'AG4', 'AH4', 'AI4', 'AK3', 'AL3', 'AM3',  'AO4', 'AP4', 'AQ4', 'AX4', 'BM4']:
+    for _pos in ['AF4', 'AG4', 'AH4', 'AI4', 'AK3', 'AL3', 'AM3',  'AO4', 'AP4', 'AQ4', 'AX4', 'BM2', 'BP3']:
         ws[_pos].number_format = '0.0%'
     for _row in np.arange(8, 109):
         ws['BK{}'.format(_row)].number_format = '0.0%'
-        ws['BR{}'.format(_row)].number_format = '0.0%'
+        ws['BT{}'.format(_row)].number_format = '0.0%'
+    for _row in np.arange(7, 109):
+        ws['BQ{}'.format(_row)].number_format = 'kr #, ##0'
+        ws['BR{}'.format(_row)].number_format = 'kr #, ##0'
+        ws['BS{}'.format(_row)].number_format = 'kr #, ##0'
 
     for color in list(colors.keys()):
         for my_pos in colors[color]:
             for my_row in ws[my_pos]:
                 for my_cell in my_row:
                     my_cell.fill = PatternFill(patternType='solid', fgColor=color)
+
     for my_cell_pos in ['A5', 'B5', 'F1', 'F2', 'AF3', 'AG3', 'AI3', 'AF5', 'AG6', 'AN4','AO4','AP4', 'AQ4', 'AT4',
-                        'AX4', 'AY4', 'BH8', 'BI8']:
+                        'AX4', 'AY4', 'BH8', 'BI8', 'BP3']:
         ws[my_cell_pos].fill = no_fill
         ws[my_cell_pos].border = all_border
 
-    for rng in ['H1:O1', 'P1:Q1', 'R1:W1', 'Y1:AB1', 'AC1:AD1',
-                'H4:K4', 'L4:O4', 'BG4:BL4', 'BP5:BR5']:
-        ws.merge_cells(rng)
-        ws[rng.split(':')[0]].alignment = Alignment(horizontal='center', vertical='center')
-        ws[rng.split(':')[0]].font = Font(bold=True)
-
-    for rng in ['C8:C50', 'P8:P50', 'H4:W5', 'BH9:BI50', 'BO5:BR50']:
+    for rng in ['C8:C50', 'P8:P50', 'H4:W5', 'BH9:BI50', 'BO6:BT50', 'BO2:BO2', 'BQ3:BR3']:
         for my_row in ws[rng]:
             for my_cell in my_row:
                 my_cell.border = all_border
+
+    for rng in ['BP7:BR7']:
+        for my_row in ws[rng]:
+            for my_cell in my_row:
+                my_cell.font = Font(bold=True)
+
+    for rng in ['H1:O1', 'P1:Q1', 'R1:W1', 'Y1:AB1', 'AC1:AD1',
+                'H4:K4', 'L4:O4', 'BG4:BL4', 'BO2:BT2', 'BQ3:BQ5', 'BR3:BT5']:
+        ws.merge_cells(rng)
+        ws[rng.split(':')[0]].alignment = Alignment(horizontal='center', vertical='center')
+        ws[rng.split(':')[0]].font = Font(bold=True)
 
     wb.save(write_to_file)
 
@@ -1040,8 +1080,19 @@ def test_read_raw_heureka_results():
 
 
 def test_modify_monetization_file():
-    mf = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\XXX"
-    modify_monetization_file(mf)
+    mf = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\Test Monetization.xlsx"
+    sf = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Bestandsutvalg.xlsx"
+    pf = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings - WIP.xlsx"
+    tag = 'FHF23-999'
+
+    # Create empty monetization file
+    writer = pd.ExcelWriter(mf, engine='xlsxwriter')
+    wb = writer.book
+    writer.close()
+
+    _kwargs, combine_fractions = get_kwargs_from_stand(sf, pf, tag)
+
+    modify_monetization_file(mf, **_kwargs)
 
 
 def test_write_excel_with_equations():
@@ -1147,7 +1198,7 @@ def test_export_fossagrim_treatment():
 
 
 def test_get_kwargs_from_stand():
-    kwargs, combine_fractions = get_kwargs_from_stand_NEW(
+    kwargs, combine_fractions = get_kwargs_from_stand(
         "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Bestandsutvalg.xlsx",
         "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings – WIP.xlsx",
         "FHF23-999"
@@ -1157,12 +1208,21 @@ def test_get_kwargs_from_stand():
     print('-x-')
     print(combine_fractions)
 
+    f = 'C:\\tmp\\test.xlsx'
+    wb = openpyxl.load_workbook(f)
+    ws = wb['Sheet1']
+    for i, _key in enumerate(kwargs):
+        ws['A{}'.format(i+1)] = _key
+        ws['B{}'.format(i+1)] = kwargs[_key]
+    wb.save(f)
+
+
 
 if __name__ == '__main__':
     # test_rearrange()
     # test_export_fossagrim_stand()
     # test_export_fossagrim_treatment()
     # test_write_excel_with_equations()
-    # test_modify_monetization_file()
+    test_modify_monetization_file()
     # test_read_raw_heureka_results()
-    test_get_kwargs_from_stand()
+    # test_get_kwargs_from_stand()
