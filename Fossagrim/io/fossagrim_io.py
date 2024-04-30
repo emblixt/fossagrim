@@ -16,6 +16,27 @@ from Fossagrim.utils.monetization_parameters import \
 import Fossagrim.plotting.misc_plots as fpp
 
 
+def example_gis_database():
+    """
+    This is just a note on how to start handling tables from gis (exported from Allma)
+    :return:
+    """
+import geopandas as gpd
+# TODO
+
+base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\Sandbox\\Allma\\TEST Nord-Odal\\04180001900020000.gdb"
+
+# The following loop goes through all data tables in the above gis project and locates the table that contains
+# the key 'BEST_NR'
+for filename in os.listdir(base_dir):
+    if "gdbtable" in filename:
+        print('Reading {}'.format(filename))
+        data = gpd.read_file(os.path.join(base_dir, filename))
+        if 'BEST_NR' in list(data.keys()):
+            break
+# And the following line finds the index of bestand nr. 279
+index = np.where(data['BEST_NR'] == 279.0)
+
 def get_row_index(table, key, item):
     """
     Returns the row index of the item
