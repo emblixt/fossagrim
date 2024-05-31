@@ -200,3 +200,85 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
     ax.set_ylabel(y_unit)
     ax.grid(True)
     ax.legend()
+
+
+def qc_stand_data(stand_data_table, stand_id, qc_plot_dir):
+    """
+    Creates QC plots of the stand data to highlight problems with the input before we start
+    :param stand_data_table
+        panda table
+        Output from fossagrim_io.read_excel
+    """
+    from Fossagrim.utils.definitions import fossagrim_standdata_keys
+
+    text_style = {'fontsize': 'x-small', 'bbox': {'facecolor': 'w', 'alpha': 0.5}}
+    text_style_flag = {'fontsize': 'x-small', 'bbox': {'facecolor': 'r', 'alpha': 0.5}}
+    flierprops = dict(markerfacecolor = 'r')
+
+    fig1, axs1 = plt.subplots(13, 1, figsize=(8, 12))
+    fig1.subplots_adjust(hspace=0)
+    fig1.suptitle(stand_id)
+    fig2, axs2 = plt.subplots(13, 1, figsize=(8, 12))
+    fig2.subplots_adjust(hspace=0)
+    fig2.suptitle(stand_id)
+    fig3, axs3 = plt.subplots(13, 1, figsize=(8, 12))
+    fig3.subplots_adjust(hspace=0)
+    fig3.suptitle(stand_id)
+    #fig4, axs4 = plt.subplots(13, 1, figsize=(8, 12))
+    #fig4.subplots_adjust(hspace=0)
+
+    i = 0
+    for _key in fossagrim_standdata_keys:
+        if _key not in list(stand_data_table.keys()):
+            print('WARNING! Necessary key {} is not in stand data table'.format(_key))
+        # empty columns
+        if 'Unnamed' in _key:
+            continue
+        # Columns that only should contain strings
+        if _key in ['Miljøfig', 'Bonitering\ntreslag', 'Tetthet', 'Fossagrim ID']:
+            continue
+        if i < 13:
+            axs = axs1
+            ii = i
+        elif i < 26:
+            axs = axs2
+            ii = i - 13
+        else:
+            axs = axs3
+            ii = i - 26
+        # else:
+        #     axs = axs4
+        #     ii = i - 39
+        if stand_data_table[_key].values.dtype == 'object':
+            if len(stand_data_table[_key][stand_data_table[_key].isna()]) > 0:
+                axs[ii].plot([0, 1], lw=0)
+                axs[ii].text(0.1, 0.9, _key, ha='left', va='top', transform=axs[ii].transAxes, **text_style_flag)
+                axs[ii].text(0.5, 0.5, 'Contain NaNs', ha='left', va='top', transform=axs[ii].transAxes, **text_style_flag)
+            else:
+                print('WARNING: Key {} can not be plotted'.format(_key))
+                # print(stand_data_table[_key])
+                continue
+        else:
+            boxplot = axs[ii].boxplot(stand_data_table[_key].values, vert=False, flierprops=flierprops)
+            if len(boxplot['fliers'][0].get_xdata()) < 1:
+                axs[ii].text(0.1, 0.9, _key, ha='left', va='top', transform=axs[ii].transAxes, **text_style)
+            else:
+                axs[ii].text(0.1, 0.9, _key, ha='left', va='top', transform=axs[ii].transAxes, **text_style_flag)
+        axs[ii].tick_params(axis="x", direction="in", pad=-12, labelsize=8)
+        axs[ii].set_yticks([], [])
+
+        i += 1
+
+    for i, fig in enumerate([fig1, fig2, fig3]):
+        fig.savefig(os.path.join(qc_plot_dir, 'bestand qc {}.png'.format(i+1)))
+
+
+def test_qc_stand_data():
+    f = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-001 Arne Tag\\FHF24-001 Bestandsutvalg – ny plan.xlsx"
+    table = fio.read_excel(f, 7, 0)
+    qc_stand_data(table, os.path.basename(f), 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-001 Arne Tag\\QC_plots')
+    plt.show()
+
+
+if __name__ == '__main__':
+    test_qc_stand_data()

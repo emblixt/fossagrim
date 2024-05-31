@@ -91,7 +91,8 @@ def project_settings(_project_tag, _project_settings_file):
 
     _result_sheets = \
         ['{} Avg Stand-{} {}'.format(_project_tag, _x, _y) for _x, _y in
-         zip(np.repeat(list(_average_over.keys()), max(2, len(_average_over))), methods * len(_average_over))]
+         zip(np.repeat(list(_average_over.keys()), 2), methods * len(_average_over))]
+         #  zip(np.repeat(list(_average_over.keys()), max(2, len(_average_over))), methods * len(_average_over))]
 
     # Create empty QC folder if it doesn't exist from before
     if not os.path.exists(_qc_folder):
@@ -115,8 +116,6 @@ def project_settings(_project_tag, _project_settings_file):
             _ = wb.add_worksheet(_sheet)
         writer.close()
 
-    # XXX testing
-    # _kwargs, combine_fractions = fio.get_kwargs_from_stand(_stand_file, _project_settings_file, _project_tag)
     _kwargs, combine_fractions = fio.get_kwargs_from_stand(_stand_file, _project_settings_file, _project_tag)
 
     _combine_sheets = {}
@@ -141,7 +140,7 @@ def project_settings(_project_tag, _project_settings_file):
 
 if __name__ == '__main__':
     # project_tag = 'FHF23-999'
-    project_tag = 'FHF24-006'
+    project_tag = 'FHF24-019'
     project_settings_file = 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx'
 
     # Set to False after Heureka simulation results have been saved in result_file, and you want to
@@ -163,6 +162,8 @@ if __name__ == '__main__':
         arrange_import(stand_file, csv_stand_file, csv_treatment_file, average_over, stand_id_key, project_tag,
                        _verbose=verbose, **kwargs)
     elif (not fix_import) and (not monetization_file_has_been_opened_and_saved):
+        if verbose:
+            print(combine_sheets)
         arrange_results(result_file, result_sheets, combine_sheets, monetization_file, _verbose=verbose,  **kwargs)
     elif monetization_file_has_been_opened_and_saved:
         fio.qc_plots(monetization_file, project_tag)

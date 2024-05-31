@@ -37,9 +37,10 @@ variables_used_in_monetization = [
 #  Calculation part 1 of Monatization file, Columns A to (including) W
 calculation_part1_header = pd.DataFrame([
     ['Sheet updated', datetime.date.today().isoformat(), '', 'Productive, active area, ha', '', 0, '',
-     'Base case pools, ton CO2', '', '', '', '', '', '', '', 'Project case pools, ton CO2', '',
-     'Climate benefit, ton CO2', '', '', '', '', ''],
-    ['By', 'Python script', '', 'Measure, Carbon or CO2?', '', 'CO2', '=IF(F2=\"C\"{}1{}44/12)'.format(_sep, _sep),
+     '=CONCATENATE(\"Base case pools, ton \"{}$F$2)'.format(_sep), '', '', '', '', '', '', '',
+     '=CONCATENATE(\"Project case pools, ton \"{}$F$2)'.format(_sep), '',
+     '=CONCATENATE(\"Climate benefit, ton \"{}$F$2)'.format(_sep), '', '', '', '', ''],
+    ['By', 'Python script', '', 'Measure, C or CO2?', '', 'CO2', '=IF(F2=\"C\"{}1{}44/12)'.format(_sep, _sep),
      'Unit area: 1 ha', '', '', '', '=CONCATENATE(\"Active area: \"{}$F$1{}\" ha\")'.format(_sep, _sep), '', '', '',
      '=H2', 'Active area', '=H2', '', '', '=CONCATENATE(\"Active area: \"{}$F$1{}\" ha\")'.format(_sep, _sep), '', ''],
     ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
@@ -52,7 +53,7 @@ calculation_part1_header = pd.DataFrame([
      '=CONCATENATE(\"Ton \"{}$F$2{}\"/ha/yr\")'.format(_sep, _sep), '=CONCATENATE(\"Ton \"{}$F$2)'.format(_sep),
      '=CONCATENATE(\"Ton \"{}$F$2{}\"/\"{}A5{}\"yr\")'.format(_sep, _sep, _sep, _sep),
      '=CONCATENATE(\"Ton \"{}$F$2{}\"/yr\")'.format(_sep, _sep)],
-    [5, 2024, 'vol fub m3/ha', 'C ton/ha', 'C ton/ha', 'C ton/ha/ 5yr', 'C ton/ha', 'Forest', 'Product',
+    [5, '=YEAR($AF$5)', 'vol fub m3/ha', 'C ton/ha', 'C ton/ha', 'C ton/ha/ 5yr', 'C ton/ha', 'Forest', 'Product',
      'Substitution', 'Base case', 'Forest', 'Product', 'Substitution', 'Base case', 'Project', 'Project',
      'Accumulated', 'Interval', 'Yearly', 'Accumulated', 'Interval', 'Yearly'],
     ['t', 'year', 'COPY OVER!', '', '', '', '', 'COPY OVER!', '', '', '', '', '', '', '', 'COPY OVER!', '', '', '',
@@ -65,8 +66,8 @@ calculation_part1 = pd.concat([
     calculation_part1_header,
     pd.DataFrame([['=$A$5 *  (row() - 8)',
                    '=B$5+A{}'.format(_row),
-                   '=\'Rearranged results\'!G{}*$G$2'.format(_row - 4),
-                   '=C{}*k'.format(_row),
+                   '=\'Rearranged results\'!G{}'.format(_row - 4),
+                   '=C{}*$G$2*k'.format(_row),
                    '=D{}*p'.format(_row),
                    '=IF(H{}>0{}I{}-I{}{})'.format(_row, _sep, _row, _row - 1, _sep),
                    '=D{}*(p*SFsawn+pp*SFpp+pf*SFfuel)+(E{}-F{})*psfuel*SFfuel'.format(_row, _row, _row),
@@ -93,7 +94,7 @@ calculation_part1 = pd.concat([
 resampled_section = pd.concat(
 [
         pd.DataFrame([
-            ['Resampled Climate benefit, ton CO2', '', '', '', 'Climate benefit', ''],
+            ['=CONCATENATE(\"Resampled Climate benefit, ton \"{}$F$2)'.format(_sep), '', '', '', 'Climate benefit', ''],
             ['', '', '', '', '', ''],
             ['', '', '', '', '', ''],
             ['', '', '=CONCATENATE(\"Ton \"{}$F$2{}\"/yr")'.format(_sep, _sep),

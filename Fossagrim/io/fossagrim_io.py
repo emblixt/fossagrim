@@ -21,21 +21,22 @@ def example_gis_database():
     This is just a note on how to start handling tables from gis (exported from Allma)
     :return:
     """
-import geopandas as gpd
-# TODO
+    import geopandas as gpd
+    # TODO
 
-base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\Sandbox\\Allma\\TEST Nord-Odal\\04180001900020000.gdb"
+    base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\Sandbox\\Allma\\TEST Nord-Odal\\04180001900020000.gdb"
 
-# The following loop goes through all data tables in the above gis project and locates the table that contains
-# the key 'BEST_NR'
-for filename in os.listdir(base_dir):
-    if "gdbtable" in filename:
-        print('Reading {}'.format(filename))
-        data = gpd.read_file(os.path.join(base_dir, filename))
-        if 'BEST_NR' in list(data.keys()):
-            break
-# And the following line finds the index of bestand nr. 279
-index = np.where(data['BEST_NR'] == 279.0)
+    # The following loop goes through all data tables in the above gis project and locates the table that contains
+    # the key 'BEST_NR'
+    for filename in os.listdir(base_dir):
+        if "gdbtable" in filename:
+            print('Reading {}'.format(filename))
+            data = gpd.read_file(os.path.join(base_dir, filename))
+            if 'BEST_NR' in list(data.keys()):
+                break
+    # And the following line finds the index of bestand nr. 279
+    index = np.where(data['BEST_NR'] == 279.0)
+
 
 def get_row_index(table, key, item):
     """
@@ -297,6 +298,10 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
 
             if write_monetization_file:
                 _start_col = 0 + (i + 0) * (len(list(combined_table.keys())) + 2)
+                if verbose:
+                    print("'rearrange_raw_heureka_results' adds combined results to column {}, in sheet {} in {}".format(
+                        _start_col, result_sheet_name, os.path.basename(monetization_file)
+                    ))
                 with pd.ExcelWriter(monetization_file, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
                     combined_table.to_excel(writer, sheet_name=result_sheet_name, startcol=_start_col, startrow=2)
 
@@ -1238,12 +1243,25 @@ def test_get_kwargs_from_stand():
     wb.save(f)
 
 
+def test_average_over():
+    f = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Bestandsutvalg.xlsx"
+    table = read_excel(f, 7, 0)
+    avg_over = {
+        'Spruce': [1, 4, 8],
+        'Pine': [2, 3, 5, 6, 7],
+        'Birch': [9, 10]
+    }
+    _key = 'Bestand'
+    out_table = average_over_stands(avg_over, table, _key, 'TEST', verbose=True)
+    print(out_table.iloc[:, 10:18])
+
 
 if __name__ == '__main__':
     # test_rearrange()
     # test_export_fossagrim_stand()
     # test_export_fossagrim_treatment()
     # test_write_excel_with_equations()
-    test_modify_monetization_file()
+    # test_modify_monetization_file()
     # test_read_raw_heureka_results()
     # test_get_kwargs_from_stand()
+    test_average_over()
