@@ -21,21 +21,22 @@ def example_gis_database():
     This is just a note on how to start handling tables from gis (exported from Allma)
     :return:
     """
-import geopandas as gpd
-# TODO
+    import geopandas as gpd
+    # TODO
 
-base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\Sandbox\\Allma\\TEST Nord-Odal\\04180001900020000.gdb"
+    base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\Sandbox\\Allma\\TEST Nord-Odal\\04180001900020000.gdb"
 
-# The following loop goes through all data tables in the above gis project and locates the table that contains
-# the key 'BEST_NR'
-for filename in os.listdir(base_dir):
-    if "gdbtable" in filename:
-        print('Reading {}'.format(filename))
-        data = gpd.read_file(os.path.join(base_dir, filename))
-        if 'BEST_NR' in list(data.keys()):
-            break
-# And the following line finds the index of bestand nr. 279
-index = np.where(data['BEST_NR'] == 279.0)
+    # The following loop goes through all data tables in the above gis project and locates the table that contains
+    # the key 'BEST_NR'
+    for filename in os.listdir(base_dir):
+        if "gdbtable" in filename:
+            print('Reading {}'.format(filename))
+            data = gpd.read_file(os.path.join(base_dir, filename))
+            if 'BEST_NR' in list(data.keys()):
+                break
+    # And the following line finds the index of bestand nr. 279
+    index = np.where(data['BEST_NR'] == 279.0)
+
 
 def get_row_index(table, key, item):
     """
@@ -722,13 +723,13 @@ def get_kwargs_from_stand_OLD(stand_file, project_settings_file, project_tag):
     combine_fractions = [ws[_x].value for _x in combine_positions]
     _kwarg_position_keys = [
         'Position of total area',
-        'Position of Flow 1 total volume',
-        'Position of Flow 2 total volume',
+        'Position of Batch 1 total volume',
+        'Position of Batch 2 total volume',
         'Position of passive forest total volume',
     ]
     _kwarg_direct_keys = [
-        'Flow 1 start date',
-        'Flow 2 delay',
+        'Batch 1 start date',
+        'Batch 2 delay',
         'Root net',
         'Contract length',
         'Rent',
@@ -774,19 +775,24 @@ def get_kwargs_from_stand(stand_file, project_settings_file, project_tag):
         if project_tag in p_name:
             break
 
+    if i is None:
+        raise IOError('Project tag {} not found in {}'.format(
+            project_tag, os.path.basename(project_settings_file)
+        ))
+
     combine_positions = [_x.strip() for _x in p_tabl['Position of fractions when combined'][i].split(',')]
     wb = openpyxl.load_workbook(stand_file, data_only=True)
     ws = wb.active
     combine_fractions = [ws[_x].value for _x in combine_positions]
     _kwarg_position_keys = [
         'Position of total area',
-        'Position of Flow 1 total volume',
-        'Position of Flow 2 total volume',
+        'Position of Batch 1 total volume',
+        'Position of Batch 2 total volume',
         'Position of passive forest total volume',
     ]
     _kwarg_direct_keys = {
-        'Flow 1 start date': 'J',
-        'Flow 2 delay': 'L',
+        'Batch 1 start date': 'J',
+        'Batch 2 delay': 'L',
         'Root net': 'N',
         'Contract length': 'O',
         'Rent': 'P',
@@ -841,12 +847,12 @@ def modify_monetization_file(write_to_file, **_kwargs):
 
     ws = wb['Monetization']
     ws['F1'].value = _kwargs['Position of total area']/10.  # from mål to Ha
-    ws['AF3'].value = _kwargs['Position of Flow 1 total volume']
-    ws['AG3'].value = _kwargs['Position of Flow 2 total volume']
-    ws['AI3'].value = _kwargs['Position of Flow 1 total volume'] + _kwargs['Position of Flow 2 total volume'] + \
+    ws['AF3'].value = _kwargs['Position of Batch 1 total volume']
+    ws['AG3'].value = _kwargs['Position of Batch 2 total volume']
+    ws['AI3'].value = _kwargs['Position of Batch 1 total volume'] + _kwargs['Position of Batch 2 total volume'] + \
         _kwargs['Position of passive forest total volume']
-    ws['AF5'].value = _kwargs['Flow 1 start date']
-    ws['AG6'].value = _kwargs['Flow 2 delay']
+    ws['AF5'].value = _kwargs['Batch 1 start date']
+    ws['AG6'].value = _kwargs['Batch 2 delay']
     ws['AF8'].value = _kwargs['Root net']
     ws['AN4'].value = _kwargs['Contract length']
     ws['AO4'].value = _kwargs['Rent']
