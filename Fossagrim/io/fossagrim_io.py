@@ -3,6 +3,7 @@ import openpyxl
 import pandas as pd
 import numpy as np
 import os
+from datetime import datetime
 
 from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, \
     heureka_standdata_keys, heureka_standdata_desc, \
@@ -15,27 +16,79 @@ from Fossagrim.utils.monetization_parameters import \
 
 import Fossagrim.plotting.misc_plots as fpp
 
+def example_contract_generator():
+    """
+    An example on how we can generate a contract based on a template file
+    """
+    from docx import Document
+
+    def replace_text_in_paragraph(_paragraph, _key, _value):
+        if _key in _paragraph.text:
+            inline = _paragraph.runs
+            for item in inline:
+                if _key in item.text:
+                    item.text = item.text.replace(_key, _value)
+
+    variables = {
+        "<DAGENS DATO>": datetime.today().strftime('%Y-%m-%d'),
+        "<SKOGEIER>": "Pål",
+        "<PROSJEKTNAVN>": "FHF24-001 - Pål",
+        "<KOMMUNE>": "Oslo",
+        "<KONTRAKTSNUMMER>": "FCC24 - 003",
+        "<ORG NR>": "1970-01-01",
+        "<ADRESSE>": "Mellomveien 45, 0099 HVOR",
+        "<TELEFON>": "+47 11 22 33",
+        "<EPOST>": "to.whom@yahoo.com",
+        "<KONTONUMMER>": "123 456 789"
+    }
+    base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\Sandbox"
+
+    template_file_path = os.path.join(base_dir,'Fossagrim prosjektavtale - template.docx')
+    output_file_path = template_file_path.replace('template', '{} {}'.format(
+        variables['<PROSJEKTNAVN>'], variables['<DAGENS DATO>']))
+
+    template_document = Document(template_file_path)
+
+    for variable_key, variable_value in variables.items():
+        for paragraph in template_document.paragraphs:
+            # TODO
+            # it detects and run the replace, but it is not reflected in the output file
+            replace_text_in_paragraph(paragraph, variable_key, variable_value)
+            # if variable_key in paragraph.text:
+            #     inline = paragraph.runs
+            #     for item in inline:
+            #         if variable_key in item.text:
+            #             item.text = item.text.replace(variable_key, variable_value)
+
+        for table in template_document.tables:
+            for col in table.columns:
+                for cell in col.cells:
+                    for paragraph in cell.paragraphs:
+                        replace_text_in_paragraph(paragraph, variable_key, variable_value)
+
+    template_document.save(output_file_path)
+
 
 def example_gis_database():
     """
     This is just a note on how to start handling tables from gis (exported from Allma)
     :return:
     """
-import geopandas as gpd
-# TODO
+    import geopandas as gpd
+    # TODO
 
-base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\Sandbox\\Allma\\TEST Nord-Odal\\04180001900020000.gdb"
+    base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\Sandbox\\Allma\\TEST Nord-Odal\\04180001900020000.gdb"
 
-# The following loop goes through all data tables in the above gis project and locates the table that contains
-# the key 'BEST_NR'
-for filename in os.listdir(base_dir):
-    if "gdbtable" in filename:
-        print('Reading {}'.format(filename))
-        data = gpd.read_file(os.path.join(base_dir, filename))
-        if 'BEST_NR' in list(data.keys()):
-            break
-# And the following line finds the index of bestand nr. 279
-index = np.where(data['BEST_NR'] == 279.0)
+    # The following loop goes through all data tables in the above gis project and locates the table that contains
+    # the key 'BEST_NR'
+    for filename in os.listdir(base_dir):
+        if "gdbtable" in filename:
+            print('Reading {}'.format(filename))
+            data = gpd.read_file(os.path.join(base_dir, filename))
+            if 'BEST_NR' in list(data.keys()):
+                break
+    # And the following line finds the index of bestand nr. 279
+    index = np.where(data['BEST_NR'] == 279.0)
 
 def get_row_index(table, key, item):
     """
@@ -1238,12 +1291,12 @@ def test_get_kwargs_from_stand():
     wb.save(f)
 
 
-
 if __name__ == '__main__':
     # test_rearrange()
     # test_export_fossagrim_stand()
     # test_export_fossagrim_treatment()
     # test_write_excel_with_equations()
-    test_modify_monetization_file()
+    # test_modify_monetization_file()
     # test_read_raw_heureka_results()
     # test_get_kwargs_from_stand()
+    example_contract_generator()
