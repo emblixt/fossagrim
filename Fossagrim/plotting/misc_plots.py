@@ -227,10 +227,14 @@ def qc_stand_data(stand_data_table, stand_id, qc_plot_dir):
     #fig4, axs4 = plt.subplots(13, 1, figsize=(8, 12))
     #fig4.subplots_adjust(hspace=0)
 
+
     i = 0
     for _key in fossagrim_standdata_keys:
-        if _key not in list(stand_data_table.keys()):
-            print('WARNING! Necessary key {} is not in stand data table'.format(_key))
+        # The number 38 should reflect the part of the stand data table which contains the necessary data
+        if _key not in list(stand_data_table.keys())[:38]:
+            error_txt = 'ERROR! Necessary key {} is not in stand data table'.format(_key)
+            print(error_txt)
+            raise IOError(error_txt)
         # empty columns
         if 'Unnamed' in _key:
             continue
@@ -273,12 +277,27 @@ def qc_stand_data(stand_data_table, stand_id, qc_plot_dir):
         fig.savefig(os.path.join(qc_plot_dir, 'bestand qc {}.png'.format(i+1)))
 
 
+def list_duplicates(seq):
+    seen = set()
+    seen_add = seen.add
+    # adds all elements it doesn't know yet to seen and all other to seen_twice
+    seen_twice = set( x for x in seq if x in seen or seen_add(x) )
+    # turn the set into a list (as requested)
+    return list(seen_twice)
+
+
+def test_list_duplicates():
+    print(list_duplicates(['A', 'B', 'C', 'A']))
+    print(list_duplicates([1, 2, 3, 1]))
+
+
 def test_qc_stand_data():
-    f = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-001 Arne Tag\\FHF24-001 Bestandsutvalg – ny plan.xlsx"
+    f = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-014 Arne Tag\\Bestandsoversikt 16052024.xlsx"
     table = fio.read_excel(f, 7, 0)
-    qc_stand_data(table, os.path.basename(f), 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-001 Arne Tag\\QC_plots')
+    qc_stand_data(table, os.path.basename(f), 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-014 Arne Tag\\QC_plots')
     plt.show()
 
 
 if __name__ == '__main__':
     test_qc_stand_data()
+    # test_list_duplicates()

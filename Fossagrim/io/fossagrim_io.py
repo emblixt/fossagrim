@@ -473,12 +473,12 @@ def average_over_stands(average_over, table, stand_id_key, average_name, verbose
             elif key in keys_to_sum_over:
                 this_data = np.sum(table[key][average_ind])
                 if verbose:
-                    print(' {}: {}'.format(key, this_data))
+                    print(' Sum over: {}: {}'.format(key, this_data))
                 this_row_of_data.append(this_data)
             elif key in keys_to_average_over:
                 this_data = np.sum(table['Prod.areal'][average_ind] * table[key][average_ind]) / total_area
                 if verbose:
-                    print(' {}: {}'.format(key, this_data))
+                    print(' Average over:{}: {}'.format(key, this_data))
                 this_row_of_data.append(this_data)
             elif key in keys_to_most_of:
                 # An area weighted 'most of' calculation
@@ -487,13 +487,13 @@ def average_over_stands(average_over, table, stand_id_key, average_name, verbose
                 # index of original data closest to the average
                 ind = np.argmin((this_data - area_weighted_average)**2)
                 if verbose:
-                    print(' {}: {}'.format(key, this_data[ind]))
+                    print(' Most of: {}: {}'.format(key, this_data[ind]))
                 this_row_of_data.append(this_data[ind])
             else:
                 # for other parameters, just copy the first selected stand
                 this_data = table[key][average_ind[0]]
                 if verbose:
-                    print(' {}: {}'.format(key, this_data))
+                    print(' Copy first: {}: {}'.format(key, this_data))
                 this_row_of_data.append(this_data)
 
         avg_table.loc[len(avg_table)] = this_row_of_data

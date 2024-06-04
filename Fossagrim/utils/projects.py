@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import openpyxl
 # from copy import deepcopy
+import Fossagrim.plotting.misc_plots as fpp
 import Fossagrim.io.fossagrim_io as fio
 
 methods = ['BAU', 'PRES']  # "Business as usual" and "Preservation"
@@ -10,6 +11,14 @@ methods = ['BAU', 'PRES']  # "Business as usual" and "Preservation"
 
 def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_over, _stand_id_key, _project_tag,
                    _verbose=False, **_kwargs):
+
+    # QC input table
+    table = fio.read_excel(_stand_file, 7, 0)
+    fpp.qc_stand_data(
+        table,
+        os.path.basename(_stand_file),
+        os.path.join(os.path.dirname(_stand_file), 'QC_plots')
+    )
 
     fio.export_fossagrim_stand_to_heureka(
         _stand_file,
@@ -65,8 +74,15 @@ def project_settings(_project_tag, _project_settings_file):
     for i, p_name in enumerate(p_tabl['Project name']):
         if not isinstance(p_name, str):
             continue
+        if p_tabl['Status'][i] not in ['Active', 'Prospective']:
+            continue
         if _project_tag in p_name:
             break
+
+    if i is None:
+        raise IOError('Project tag {} not found in {}'.format(
+            _project_tag, os.path.basename(_project_settings_file)
+        ))
 
     _project_folder = os.path.join(w_dir, p_tabl['Project name'][i])
     _qc_folder = os.path.join(_project_folder, 'QC_plots')
@@ -91,7 +107,8 @@ def project_settings(_project_tag, _project_settings_file):
 
     _result_sheets = \
         ['{} Avg Stand-{} {}'.format(_project_tag, _x, _y) for _x, _y in
-         zip(np.repeat(list(_average_over.keys()), max(2, len(_average_over))), methods * len(_average_over))]
+         zip(np.repeat(list(_average_over.keys()), 2), methods * len(_average_over))]
+         # zip(np.repeat(list(_average_over.keys()), max(2, len(_average_over))), methods * len(_average_over))]
 
     # Create empty QC folder if it doesn't exist from before
     if not os.path.exists(_qc_folder):
@@ -141,12 +158,12 @@ def project_settings(_project_tag, _project_settings_file):
 
 if __name__ == '__main__':
     # project_tag = 'FHF23-999'
-    project_tag = 'FHF24-006'
+    project_tag = 'FHF24-014'
     project_settings_file = 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx'
 
     # Set to False after Heureka simulation results have been saved in result_file, and you want to
     # rearrange the results so that they are easier to include in Excel calculations
-    fix_import = False
+    fix_import = True
 
     verbose = True
 
