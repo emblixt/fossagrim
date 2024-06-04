@@ -466,7 +466,7 @@ def average_over_stands(average_over, table, stand_id_key, average_name, verbose
         # for key in fossagrim_standdata_keys:
         for key in list(table.keys()):
             if key in ['Fossagrim ID', 'Bestand']:
-                this_data = '{}-{}'.format(average_name, avg_group)
+                this_data = '{}{}'.format(average_name, avg_group)
                 if verbose:
                     print(' {}: {}'.format(key, this_data))
                 this_row_of_data.append(this_data)
@@ -746,6 +746,7 @@ def get_kwargs_from_stand_OLD(stand_file, project_settings_file, project_tag):
         kwargs[_key] = p_tabl[_key][i]
     wb.close()
 
+    import Fossagrim.io.fossagrim_io as fio
     return kwargs, combine_fractions
 
 

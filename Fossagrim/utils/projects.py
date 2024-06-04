@@ -25,7 +25,7 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
         _csv_stand_file,
         average_over=_average_over,
         stand_id_key=_stand_id_key,
-        average_name='{} Avg Stand'.format(_project_tag),
+        average_name='{} '.format(_project_tag),
         verbose=_verbose
     )
 
@@ -34,7 +34,7 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
         _csv_treatment_file,
         average_over=_average_over,
         stand_id_key=_stand_id_key,
-        average_name='{} Avg Stand'.format(_project_tag)
+        average_name='{} '.format(_project_tag)
     )
 
 
@@ -71,15 +71,17 @@ def project_settings(_project_tag, _project_settings_file):
     w_dir = os.path.dirname(_project_settings_file)
 
     i = None
+    tag_found = False
     for i, p_name in enumerate(p_tabl['Project name']):
         if not isinstance(p_name, str):
             continue
         if p_tabl['Status'][i] not in ['Active', 'Prospective']:
             continue
         if _project_tag in p_name:
+            tag_found = True
             break
 
-    if i is None:
+    if not tag_found:
         raise IOError('Project tag {} not found in {}'.format(
             _project_tag, os.path.basename(_project_settings_file)
         ))
@@ -106,7 +108,7 @@ def project_settings(_project_tag, _project_settings_file):
             _average_over[f_type] = [_x.strip() for _x in average_over_strings[j].split(';')]
 
     _result_sheets = \
-        ['{} Avg Stand-{} {}'.format(_project_tag, _x, _y) for _x, _y in
+        ['{} {} {}'.format(_project_tag, _x, _y) for _x, _y in
          zip(np.repeat(list(_average_over.keys()), 2), methods * len(_average_over))]
          # zip(np.repeat(list(_average_over.keys()), max(2, len(_average_over))), methods * len(_average_over))]
 
@@ -158,7 +160,7 @@ def project_settings(_project_tag, _project_settings_file):
 
 if __name__ == '__main__':
     # project_tag = 'FHF23-999'
-    project_tag = 'FHF24-014'
+    project_tag = 'FHF24-0014'
     project_settings_file = 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx'
 
     # Set to False after Heureka simulation results have been saved in result_file, and you want to
