@@ -817,6 +817,11 @@ def get_kwargs_from_stand(stand_file, project_settings_file, project_tag):
             _kwarg_direct_keys[_key], i+3)  # +3 because 2 header lines and python starts counting at 0
     wb.close()
 
+    if None in combine_fractions:
+        raise IOError('Some fractions are lacking in cells: {} in {}'.format(
+            ', '.join(combine_positions), stand_file
+        ))
+
     return kwargs, combine_fractions
 
 
@@ -1227,22 +1232,25 @@ def test_export_fossagrim_treatment():
 
 def test_get_kwargs_from_stand():
     kwargs, combine_fractions = get_kwargs_from_stand(
-        "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Bestandsutvalg.xlsx",
-        "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings – WIP.xlsx",
-        "FHF23-999"
+        # "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Bestandsutvalg.xlsx",
+        "C:\\Users\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0014 Arne Tag\\Bestandsoversikt 16052024.xlsx",
+        "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx",
+        "FHF24-0014"
     )
     for _key in kwargs:
         print(_key, ':', kwargs[_key])
     print('-x-')
     print(combine_fractions)
+    if None in combine_fractions:
+        print('None is found')
 
-    f = 'C:\\tmp\\test.xlsx'
-    wb = openpyxl.load_workbook(f)
-    ws = wb['Sheet1']
-    for i, _key in enumerate(kwargs):
-        ws['A{}'.format(i+1)] = _key
-        ws['B{}'.format(i+1)] = kwargs[_key]
-    wb.save(f)
+    # f = 'C:\\tmp\\test.xlsx'
+    # wb = openpyxl.load_workbook(f)
+    # ws = wb['Sheet1']
+    # for i, _key in enumerate(kwargs):
+    #     ws['A{}'.format(i+1)] = _key
+    #     ws['B{}'.format(i+1)] = kwargs[_key]
+    # wb.save(f)
 
 
 
@@ -1251,6 +1259,6 @@ if __name__ == '__main__':
     # test_export_fossagrim_stand()
     # test_export_fossagrim_treatment()
     # test_write_excel_with_equations()
-    test_modify_monetization_file()
+    # test_modify_monetization_file()
     # test_read_raw_heureka_results()
-    # test_get_kwargs_from_stand()
+    test_get_kwargs_from_stand()
