@@ -29,6 +29,8 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
         verbose=_verbose
     )
 
+    # TODO
+    # Add the treatment to the csv stand file instead, among the UserDefinedVariables, then we don't need this file
     fio.export_fossagrim_treatment(
         _stand_file,
         _csv_treatment_file,
@@ -160,7 +162,7 @@ def project_settings(_project_tag, _project_settings_file):
 
 if __name__ == '__main__':
     # project_tag = 'FHF23-999'
-    project_tag = 'FHF24-0014'
+    project_tag = 'FHF23-0005'
     project_settings_file = 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx'
 
     # Set to False after Heureka simulation results have been saved in result_file, and you want to

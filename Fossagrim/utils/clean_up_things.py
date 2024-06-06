@@ -1,8 +1,10 @@
 import os.path
 
+from pathlib import Path
 import openpyxl
 
 import Fossagrim.io.fossagrim_io as fio
+from Fossagrim.utils.definitions import heureka_standdata_keys, heureka_standdata_desc
 
 
 def rename_avg_stands(_result_file):
@@ -19,12 +21,28 @@ def rename_avg_stands(_result_file):
             print(' - Renamed to: {}'.format(new_sheet_name))
     wb.save(_result_file)
 
-
 def find_and_rename_avg_stands():
-    from pathlib import Path
     file_list = Path("C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger").rglob('*result*xlsx')
     for result_file in file_list:
+        pass
         # rename_avg_stands(result_file)
+
+
+def collect_all_stand_data():
+    base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger"
+    result_file = os.path.join(base_dir, 'All stand data.csv')
+    # create header lines of result file
+    fio.write_csv_file(result_file, heureka_standdata_keys, heureka_standdata_desc)
+
+    file_list = Path(base_dir).rglob('*Averaged stand data.csv')
+    with open(result_file, 'a') as _out:  # append
+        for result_file in file_list:
+            print(result_file)
+            with open(result_file, 'r') as _in:
+                for line in _in.readlines():
+                    if 'FHF' in line[:10]:
+                        _out.write(line)
+
 
 
 def test_rename_avg_stands():
@@ -33,4 +51,4 @@ def test_rename_avg_stands():
 
 
 if __name__ == '__main__':
-    find_and_rename_avg_stands()
+    collect_all_stand_data()

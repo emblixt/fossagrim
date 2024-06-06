@@ -804,6 +804,10 @@ def get_kwargs_from_stand(stand_file, project_settings_file, project_tag):
         'Gross price': 'U',
         'NIBOR 10yr': 'V'
     }
+    # print(i, _kwarg_position_keys)
+    # for _key in _kwarg_position_keys:
+    #     print(_key, p_tabl[_key][i])
+
     kwargs = {
         _key: ws[p_tabl[_key][i]].value for _key in _kwarg_position_keys
     }
@@ -953,8 +957,8 @@ def style_monetization_file(write_to_file):
                 for my_cell in my_row:
                     my_cell.fill = PatternFill(patternType='solid', fgColor=color)
 
-    for my_cell_pos in ['A5', 'B5', 'F1', 'F2', 'AF3', 'AG3', 'AI3', 'AF5', 'AG6', 'AN4','AO4','AP4', 'AQ4', 'AT4',
-                        'AX4', 'AY4', 'BH8', 'BI8', 'BP3']:
+    for my_cell_pos in ['A5', 'B5', 'F1', 'F2', 'AF3', 'AG3', 'AI3', 'AF5', 'AF8', 'AG6', 'AN4','AO4','AP4',
+                        'AQ4', 'AT4', 'AX4', 'AY4', 'BH8', 'BI8', 'BP3']:
         ws[my_cell_pos].fill = no_fill
         ws[my_cell_pos].border = all_border
 
