@@ -173,10 +173,10 @@ heureka_standdata_keys = heureka_mandatory_standdata_keys + [
     'RegenerationBreeded',
     'Note',
     'UserDefinedVariable1_TaxType',
-    'UserDefinedVariable2',
-    'UserDefinedVariable3',
-    'UserDefinedVariable4',
-    'UserDefinedVariable5',
+    'UserDefinedVariable2_RotationPeriod',
+    'UserDefinedVariable3_ThinningYear',
+    'UserDefinedVariable4_PlantDensity',
+    'UserDefinedVariable5_ClimateEffect',
     'UserDefinedVariable6',
     'UserDefinedVariable7',
     'UserDefinedVariable8',
@@ -196,7 +196,8 @@ heureka_standdata_desc = [
     'Volym (m3sk/ha. produktiv areal)',
     '','','','','','','','','','','','','','','','','','','','','','','','','','', '','','','',
     '','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','',
-    '','','','','','','','','','','','','','','','','','','','',''
+    '','','','','','','','','','','','År','År','Planter/ha','Sum of diff. in Total carbon (PRES-BAU) over 30 yrs',
+    '','','','','',''
 ]
 
 heureka_treatment_keys = [

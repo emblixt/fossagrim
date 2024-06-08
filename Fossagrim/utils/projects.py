@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
     # Set to False after Heureka simulation results have been saved in result_file, and you want to
     # rearrange the results so that they are easier to include in Excel calculations
-    fix_import = False
+    fix_import = True
 
     verbose = True
 

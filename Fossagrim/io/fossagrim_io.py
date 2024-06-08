@@ -665,7 +665,7 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
         write_csv_file(
             write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
             StandId=table['Fossagrim ID'][i], Year=0,
-            Treatment='FinalFeeling', Note=notes[i]
+            Treatment='FinalFelling', Note=notes[i]
         )
         write_csv_file(
             write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
@@ -682,13 +682,43 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
         write_csv_file(
             write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
             StandId=table['Fossagrim ID'][i], Year=table['Rotasjonsperiode'][i],
-            Treatment='FinalFeeling', Note=notes[i]
+            Treatment='FinalFelling', Note=notes[i]
         )
         write_csv_file(
             write_to_file, heureka_treatment_keys, heureka_treatment_desc, append=True,
             StandId=table['Fossagrim ID'][i], Year=table['Rotasjonsperiode'][i] + 2,
             Treatment='Planting', PlantDensity=table['Plantetetthet'][i] * 10., Note=notes[i]
         )
+
+
+def read_fossagrim_treatment(
+        treatment_csv_file,
+        project_tag,
+        wood_species = 'Spruce'):
+    """
+
+    :param treatment_csv_file:
+    :param project_tag:
+    :param wood_species:
+    :return:
+        list
+        [thinning_year, final_felling_year, plant_density]  # [year, year, plants/ha]
+    """
+    thinning_year = None
+    final_felling_year = None
+    plant_density = None
+    with open(treatment_csv_file) as f:
+        lines = f.readlines()
+        for line in lines:
+            split_line = line.split(';')
+            if '{} {}'.format(project_tag, wood_species) == split_line[2]:
+                if 'FinalFelling' in line:
+                    final_felling_year = float(split_line[4])
+                if 'Thinning' in line:
+                    thinning_year = float(split_line[4])
+                if 'Planting' in line:
+                    plant_density = float(split_line[8])
+    return [thinning_year, final_felling_year, plant_density]
 
 
 def get_kwargs_from_stand_OLD(stand_file, project_settings_file, project_tag):
@@ -1109,6 +1139,102 @@ def qc_plots(monetization_file, project_tag, plot_dir=None):
     # farmed_offsets()
 
 
+def get_carbon_effect(result_file, stand_id,
+                      average_years=None,
+                      variable="Total Carbon Stock (dead wood, soil, trees, stumps and roots)",
+                      save_plot_to=None):
+    """
+    Calculates the difference in Total carbon stock between PRES (preservation) and BAU (Business as usual)
+    integrated over the given number of years
+    :param result_file:
+         str
+         Name of excel file that contain the "raw" Heureka results
+    :param stand_id
+         str
+    :param average_years:
+         int
+         Number of years to calculate the integrated effect over
+    :param variable:
+        str
+        Variable name to use in the calculation of the carbon effect
+    :param save_plot_to:
+        str
+        Name of file to save the plot to.
+    :return:
+        float
+        Integrated effect of chosen parameter (variable) over <average_years> years for the given forest stand
+        (project_tag) and wood_species
+    """
+    if average_years is None:
+        average_years = 30
+    try:
+        diff = fpp.plot_from_heureka_results(
+            result_file=result_file,
+            sheets=['{} {}'.format(stand_id, _case) for _case in ['PRES', 'BAU']],
+            params=variable,
+            save_plot_to=save_plot_to,
+            diff_sheets=True
+        )
+        # Heureka runs the simulation using timesteps which are 5 years long
+        i = int(np.floor(average_years / 5))
+        if diff is not None:
+            return np.sum(diff[:i])
+        else:
+            return None
+    except ValueError as error:
+        print(error)
+        return None
+
+
+def collect_all_stand_data():
+    from pathlib import Path
+    base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger"
+    out_file = os.path.join(base_dir, 'All stand data.csv')
+    # create header lines of out file
+    write_csv_file(out_file, heureka_standdata_keys, heureka_standdata_desc)
+
+    file_list = Path(base_dir).rglob('*Averaged stand data.csv')
+    with open(out_file, 'a') as _out:  # append
+        for stand_file in file_list:
+            print('Working on {}'.format(stand_file.name))
+            # see if there is a related Heureka results file
+            heureka_result_file = str(stand_file).replace('Averaged stand data.csv', 'Heureka results.xlsx')
+            if os.path.isfile(heureka_result_file):
+                print(' Heureka result file exists')
+
+            with open(stand_file, 'r') as _in:
+                for line in _in.readlines():
+                    split_line = line.split(';')
+                    if 'FHF' in split_line[0]:
+                        print('  Searching for stand id: {}'.format(split_line[0]))
+                        carbon_effect = get_carbon_effect(
+                            heureka_result_file,
+                            split_line[0],
+                            save_plot_to= os.path.join(
+                                os.path.dirname(heureka_result_file), 'Net Carbon Effect {}.png'.format(split_line[0]))
+                        )
+                        if carbon_effect is None:
+                            alt_stand_id = split_line[0].replace('Avg Stand-', '')
+                            print('  Searching for alternative stand id: {}'.format(alt_stand_id))
+                            carbon_effect = get_carbon_effect(
+                                heureka_result_file,
+                                alt_stand_id,
+                                save_plot_to= os.path.join(
+                                    os.path.dirname(heureka_result_file), 'Net Carbon Effect {}.png'.format(split_line[0]))
+                            )
+
+                        print('  ', carbon_effect)
+                        split_line[101] = str(carbon_effect)
+                        _out.write(';'.join(split_line))
+                        pass
+
+
+def test_read_fossagrim_treatment():
+    file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0014 Arne Tag\\FHF24-0014 Averaged treatment.csv"
+    print(read_fossagrim_treatment(file, 'FHF24-0014', 'Spruce'))
+    print(read_fossagrim_treatment(file, 'FHF24-0014', 'Rubbish'))
+
+
 def test_read_raw_heureka_results():
     file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Heureka results.xlsx"
     sheet_name = 'FHF23-999 Avg Stand-Pine PRES'
@@ -1257,6 +1383,17 @@ def test_get_kwargs_from_stand():
     # wb.save(f)
 
 
+def test_get_carbon_effect():
+    result_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0016 Margrete Folsland\\FHF24-0016 Heureka results.xlsx"
+    project_tag = "FHF24-0016"
+    wood_species = "Pine"
+    save_plot_to = result_file.replace("xlsx", "png")
+    print(save_plot_to)
+    avg = get_carbon_effect(result_file, project_tag, wood_species=wood_species, save_plot_to=save_plot_to)
+    print(avg)
+    plt.show()
+
+
 
 if __name__ == '__main__':
     # test_rearrange()
@@ -1265,4 +1402,7 @@ if __name__ == '__main__':
     # test_write_excel_with_equations()
     # test_modify_monetization_file()
     # test_read_raw_heureka_results()
-    test_get_kwargs_from_stand()
+    # test_get_kwargs_from_stand()
+    # test_get_carbon_effect()
+    # test_read_fossagrim_treatment()
+    collect_all_stand_data()

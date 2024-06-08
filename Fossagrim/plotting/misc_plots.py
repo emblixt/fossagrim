@@ -104,7 +104,8 @@ def plot_raw_data(data_dict, data_tag, my_title, qc_plot_dir):
 
 
 def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='Year',
-                              diff_sheets=False, barchart=False, year_zero=None,  **kwargs):
+                              diff_sheets=False, barchart=False, year_zero=None,
+                              save_plot_to=None,  **kwargs):
     """
     Flexible plot of data stored in typical "Heureka results.xlsx" files
     :param result_file:
@@ -114,7 +115,7 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
         str or list str
         each string is the name of a sheet in the above results Excel file
     :param params:
-        str of list of str
+        str or list of str
         each string is the (partial) name of a parameter listed in the above results Excel file
     :param ax:
     :param x_key:
@@ -125,10 +126,16 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
     :param year_zero:
         float
         When 'x_key' is Year, this value is added, so it acts as a start year
+    :param save_plot_to:
+        str
+        full file name to which the plot is saved
     :param kwargs:
         optional keywords passed on to plot function
     :return:
+        None by default
+        if diff_sheets is True, it returns the difference
     """
+    fig = None
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 10))
     if params is None:
@@ -142,12 +149,17 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
     if year_zero is None:
         year_zero = 0.
 
+    diff = None
     width = kwargs.pop('width', 4.0)
 
     # read the different sheets from the results Excel file
     data = []
     for sheet in sheets:
-        data.append(fio.read_raw_heureka_results(result_file, sheet))
+        try:
+            data.append(fio.read_raw_heureka_results(result_file, sheet))
+        except KeyError as error:
+            print(error)
+            continue
 
     # check if parameters are available in all sheets
     for d, sheet in zip(data, sheets):
@@ -170,7 +182,7 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
         if x_key == 'Year':
             x += year_zero
         if i == 0:
-            bottom_sheets = np.zeros(len(x))
+            bottom_sheets = np.zeros(len(x), dtype='float64')
         for j, p in enumerate(params):
             y_key = [_x for _x in list(d.keys()) if p.lower() in _x.lower()][0]
             y = np.asarray(d[y_key].values, dtype=np.float32)
@@ -179,7 +191,6 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
                 y_previous = y
                 last_sheet = sheet
             elif diff_sheets and y_previous is not None:
-                print(y_previous[:2], y[:2])
                 diff = y_previous - y
                 ax.plot(x, diff, label='{} - {}'.format(last_sheet, sheet), **kwargs)
                 break
@@ -192,7 +203,13 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
                     bottom_params += y
                 else:
                     ax.plot(x, y, label='{} {}'.format(p, sheet), **kwargs)
-        bottom_sheets += bottom_params
+
+        if not diff_sheets:
+            raise NotImplementedError('Problem with bottom_sheets - need check')
+        # TODO
+        # XXX
+        # problems with the line below, which is really necessary when diff_sheets is False
+        # bottom_sheets += bottom_params
         i += 1
 
     ax.set_title(os.path.basename(result_file))
@@ -200,6 +217,13 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
     ax.set_ylabel(y_unit)
     ax.grid(True)
     ax.legend()
+
+    if save_plot_to is not None:
+        if fig is None:
+            fig = ax.get_figure()
+        fig.savefig(save_plot_to)
+
+    return diff
 
 
 def qc_stand_data(stand_data_table, stand_id, qc_plot_dir):
@@ -292,12 +316,28 @@ def test_list_duplicates():
 
 
 def test_qc_stand_data():
-    f = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-014 Arne Tag\\Bestandsoversikt 16052024.xlsx"
+    f = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0014 Arne Tag\\Bestandsoversikt 16052024.xlsx"
     table = fio.read_excel(f, 7, 0)
     qc_stand_data(table, os.path.basename(f), 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-014 Arne Tag\\QC_plots')
     plt.show()
 
 
+def test_plot_heureka_results():
+    result_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0016 Margrete Folsland\\FHF24-0016 Heureka results.xlsx"
+    sheets = ["FHF24-0016 Pine PRES", "FHF24-0016 Pine BAU"]
+    params = "Total Carbon Stock (dead wood, soil, trees, stumps and roots)"
+    diff_sheets = True
+    diff = plot_from_heureka_results(
+        result_file,
+        sheets=sheets,
+        params=params,
+        diff_sheets=diff_sheets
+    )
+    print(diff)
+
+
 if __name__ == '__main__':
-    test_qc_stand_data()
+    # test_qc_stand_data()
     # test_list_duplicates()
+    test_plot_heureka_results()
+    plt.show()

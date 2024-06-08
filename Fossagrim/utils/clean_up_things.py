@@ -28,20 +28,64 @@ def find_and_rename_avg_stands():
         # rename_avg_stands(result_file)
 
 
-def collect_all_stand_data():
+def correct_spelling():
+    import shutil
     base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger"
-    result_file = os.path.join(base_dir, 'All stand data.csv')
-    # create header lines of result file
-    fio.write_csv_file(result_file, heureka_standdata_keys, heureka_standdata_desc)
+    file_list = Path(base_dir).rglob('*Averaged treatment.csv')
+    for file in file_list:
+        # create a backup file
+        orig_name = str(file)
+        new_name = orig_name.replace('.csv', '_BACKUP.csv')
+        print(new_name)
+        shutil.copy(orig_name, new_name)
+        with open(new_name) as input_file:
+            with open(orig_name, 'w') as output_file:
+                lines = input_file.readlines()
+                for line in lines:
+                    output_file.write(line.replace('Feeling', 'Felling'))
 
-    file_list = Path(base_dir).rglob('*Averaged stand data.csv')
-    with open(result_file, 'a') as _out:  # append
-        for result_file in file_list:
-            print(result_file)
-            with open(result_file, 'r') as _in:
-                for line in _in.readlines():
-                    if 'FHF' in line[:10]:
-                        _out.write(line)
+
+def merge_treatment_and_stand():
+    """
+    Adds the treatment to the stand file as UserDefinedVariables
+    :return:
+    """
+    import shutil
+    base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger"
+    treatment_files = Path(base_dir).rglob('*Averaged treatment.csv')
+    for i, tf in enumerate(treatment_files):
+        stand_id = tf.name[:10].strip()
+        if stand_id == 'FHF23-999':  # test data
+            continue
+        stand_files = Path(base_dir).rglob('*Averaged stand data.csv')
+        for j, sf in enumerate(stand_files):
+            if sf.name.replace('Averaged stand data', 'Averaged treatment') == tf.name:
+                print(stand_id, tf.name, sf.name)
+                orig_name = str(sf)
+                new_name = orig_name.replace('.csv', '_BACKUP.csv')
+                shutil.copy(orig_name, new_name)
+                print('write header lines to {}'.format(os.path.basename(orig_name)))
+                fio.write_csv_file(orig_name, heureka_standdata_keys, heureka_standdata_desc)
+                with open(orig_name, 'a') as oid:
+                    print(' Open {} for appending'.format(os.path.basename(orig_name)))
+                    with open(new_name, 'r') as fid:
+                        print('  Open {} for reading'.format(os.path.basename(new_name)))
+                        lines = fid.readlines()
+                        # open file and write
+                        for line in lines:
+                            for ws in ['Spruce', 'Pine', 'Birch', 'Avg Stand-Spruce', 'Avg Stand-Pine', 'Avg Stand-Birch']:
+                                # print('   {}'.format(ws))
+                                treatment = fio.read_fossagrim_treatment(tf, stand_id, ws)
+                                if None in treatment:
+                                    continue
+                                if '{} {}'.format(stand_id, ws) in line:
+                                    orig_line = line.split(';')
+                                    new_line = orig_line
+                                    new_line[98] = str(treatment[1])
+                                    new_line[99] = str(treatment[0])
+                                    new_line[100] = str(treatment[2])
+                                    print('    - Add treatment to {} {}'.format(stand_id, ws) )
+                                    oid.write(';'.join(new_line))
 
 
 
@@ -51,4 +95,6 @@ def test_rename_avg_stands():
 
 
 if __name__ == '__main__':
-    collect_all_stand_data()
+    # collect_all_stand_data()
+    # correct_spelling()
+    # merge_treatment_and_stand()
