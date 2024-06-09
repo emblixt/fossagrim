@@ -834,13 +834,18 @@ def get_kwargs_from_stand(stand_file, project_settings_file, project_tag):
         'Gross price': 'U',
         'NIBOR 10yr': 'V'
     }
-    # print(i, _kwarg_position_keys)
-    # for _key in _kwarg_position_keys:
-    #     print(_key, p_tabl[_key][i])
 
-    kwargs = {
-        _key: ws[p_tabl[_key][i]].value for _key in _kwarg_position_keys
-    }
+    try:
+        kwargs = {
+            _key: ws[p_tabl[_key][i]].value for _key in _kwarg_position_keys
+        }
+    except TypeError as error:
+        print(error)
+        print(i, _kwarg_position_keys)
+        for _key in _kwarg_position_keys:
+            print(_key, p_tabl[_key][i])
+        raise TypeError(error)
+
     for _key in list(_kwarg_direct_keys.keys()):
         # kwargs[_key] = "='C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\[ProjectForestsSettings – WIP.xlsx]Settings'!${}${}".format(
         #     _kwarg_direct_keys[_key], i+3)  # +3 because 2 header lines and python starts counting at 0
