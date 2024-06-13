@@ -54,7 +54,8 @@ def merge_treatment_and_stand():
     base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger"
     treatment_files = Path(base_dir).rglob('*Averaged treatment.csv')
     for i, tf in enumerate(treatment_files):
-        stand_id = tf.name[:10].strip()
+        # stand_id = tf.name[:10].strip()
+        stand_id = tf.name.split()[0].strip()
         if stand_id == 'FHF23-999':  # test data
             continue
         stand_files = Path(base_dir).rglob('*Averaged stand data.csv')
@@ -97,4 +98,4 @@ def test_rename_avg_stands():
 if __name__ == '__main__':
     # collect_all_stand_data()
     # correct_spelling()
-    # merge_treatment_and_stand()
+    merge_treatment_and_stand()

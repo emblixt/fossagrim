@@ -162,7 +162,7 @@ def project_settings(_project_tag, _project_settings_file):
 
 if __name__ == '__main__':
     # project_tag = 'FHF23-999'
-    project_tag = 'FHF23-008a'
+    project_tag = 'FHF23-007'
     project_settings_file = 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx'
 
     # Set to False after Heureka simulation results have been saved in result_file, and you want to
