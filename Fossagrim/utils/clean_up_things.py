@@ -1,6 +1,8 @@
 import os.path
 
 from pathlib import Path
+
+import matplotlib.pyplot as plt
 import openpyxl
 
 import Fossagrim.io.fossagrim_io as fio
@@ -89,6 +91,56 @@ def merge_treatment_and_stand():
                                     oid.write(';'.join(new_line))
 
 
+def collect_carbon_effect_for_test_simulations(stand_file, result_file, out_file, postfix=None):
+    """
+
+    :param stand_file:
+        str
+        Full path name of csv stand file which was used as input to the Heureka simulations
+    :param result_file:
+        str
+        Full path name to excel file which contain the raw Heureka results from above simulation
+    :param out_file:
+        str
+        Full path name of csv stand file that is a copy of the input stand file, but with the
+        calculated 30 year carbon effect added to it
+        If file exists, it appends to it
+    :param postfix:
+        str
+        Optional
+        String that is added to each stand ID to separate it from other earlier stand ID's
+    :return:
+    """
+    # test if output file exists
+    if os.path.isfile(out_file):
+        append = True
+    else:
+        append = False
+        # create header lines of out file
+        fio.write_csv_file(out_file, heureka_standdata_keys, heureka_standdata_desc)
+    append = True
+
+    fig, ax = plt.subplots()
+
+    # Open output csv file for append
+    with open(out_file, 'a') as _out:
+        # Open stand file to read each stand
+        with open(stand_file, 'r') as _in:
+            for i, line in enumerate(_in.readlines()):
+                if i < 2:
+                    continue
+                split_line = line.split(';')
+                print('Working on stand {}'.format(split_line[0]))
+                carbon_effect = fio.get_carbon_effect(result_file, split_line[0], ax=ax)
+                if carbon_effect is None:
+                    print('  Carbon effect: None')
+                    carbon_effect = ''
+                else:
+                    print('  Carbon effect: {:.2f}'.format(carbon_effect))
+
+                split_line[101] = str(carbon_effect)
+                _out.write(';'.join(split_line))
+
 
 def test_rename_avg_stands():
     f = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0016 Margrete Folsland\\FHF24-0016 Heureka results.xlsx"
@@ -98,4 +150,9 @@ def test_rename_avg_stands():
 if __name__ == '__main__':
     # collect_all_stand_data()
     # correct_spelling()
-    merge_treatment_and_stand()
+    # merge_treatment_and_stand()
+    stand_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\TestingHeurekaParameters\\Stands and treatments Pine 2.csv"
+    result_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\TestingHeurekaParameters\\Heureka results Pine 2.xlsx"
+    out_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\TestingHeurekaParameters\\Test stands with carbon effect.csv"
+    # collect_carbon_effect_for_test_simulations(stand_file, result_file, out_file)
+    plt.show()

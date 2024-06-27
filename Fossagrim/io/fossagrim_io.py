@@ -1147,6 +1147,7 @@ def qc_plots(monetization_file, project_tag, plot_dir=None):
 def get_carbon_effect(result_file, stand_id,
                       average_years=None,
                       variable="Total Carbon Stock (dead wood, soil, trees, stumps and roots)",
+                      ax=None,
                       save_plot_to=None):
     """
     Calculates the difference in Total carbon stock between PRES (preservation) and BAU (Business as usual)
@@ -1177,6 +1178,7 @@ def get_carbon_effect(result_file, stand_id,
             result_file=result_file,
             sheets=['{} {}'.format(stand_id, _case) for _case in ['PRES', 'BAU']],
             params=variable,
+            ax=ax,
             save_plot_to=save_plot_to,
             diff_sheets=True
         )
