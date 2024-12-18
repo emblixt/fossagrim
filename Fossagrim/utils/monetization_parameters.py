@@ -29,6 +29,10 @@ variables_used_in_monetization = [
     'Total Carbon Living Trees (excl. stump and roots)',
     'Total Carbon Stock (dead wood, soil, trees, stumps and roots)',
     'Total Extracted Volume Fub (m³fub)',
+    'Dead Standing Trees >=20cm',  # m3/ha
+    'Downed Deadwood >=20cm',   # m3/ha
+    'Volume All Decay Classes to Include',  # Total Volume of dead wood [m3/ha], can be used to convert from volume to ton
+    'Recreation Index After',
     'Mean Age (all trees, always basal area weighted) Before',
     'Treatment',
     'Year'

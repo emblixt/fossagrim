@@ -51,26 +51,30 @@ def arrange_results(_result_file, _sheet_names, _combine_sheets, _monetization_f
         fio.modify_monetization_file(_monetization_file, **_kwargs)
 
 
-def project_settings(_project_tag, _project_settings_file):
+def project_settings(_project_name, _project_settings_file, _fix_import: bool = True):
     """
     Reads the project settings Excel file, and extracts information from it to be used in the Heureka simulation
     and sets up files necessary for storing results and monetization calculations for the given project
 
     Keys expected in project settings files:
-    "Project name", "Status", "Forest types", "Average over stands", "Position of fractions when combined",
-    "Check length of lists", "Stand id key", "Stands file", "Results file", "Monetization file"
+    "Project name", "Project folder", "Status", "Stand id key", "Stands file", "Results file",
 
-    :param _project_tag:
+    :param _project_name:
         str
-        Name tag that identifies the current project, e.g. "FHF23-007"
+        Name that identifies the current project, e.g. "FHF23-007 Gudmund Aaker"
 
     :param _project_settings_file:
         str
         Full path name of the project settings Excel sheet.
+
+    :param _fix_import:
+        Bool
+        If True it goes through the whole process and creates results files,
+        If False, it only returns the first few arguments before creating any files and thereby
+        avoiding the possibility of overwriting the results file.
     :return:
     """
     p_tabl = fio.read_excel(_project_settings_file, 1, 'Settings')
-    w_dir = os.path.dirname(_project_settings_file)
 
     i = None
     tag_found = False
@@ -79,41 +83,65 @@ def project_settings(_project_tag, _project_settings_file):
             continue
         if p_tabl['Status'][i] not in ['Active', 'Prospective']:
             continue
-        if _project_tag in p_name:
+        if _project_name in p_name.strip():
             tag_found = True
             break
 
     if not tag_found:
-        raise IOError('Project tag {} not found in {}'.format(
-            _project_tag, os.path.basename(_project_settings_file)
+        raise IOError('Project name {} not found in {}'.format(
+            _project_name, os.path.basename(_project_settings_file)
         ))
 
-    _project_folder = os.path.join(w_dir, p_tabl['Project name'][i])
+    _project_folder = p_tabl['Project folder'][i]
     _qc_folder = os.path.join(_project_folder, 'QC_plots')
     _stand_id_key = p_tabl['Stand id key'][i]
     _stand_file = os.path.join(_project_folder, p_tabl['Stands file'][i])
     _result_file = os.path.join(_project_folder, p_tabl['Results file'][i])
-    _monetization_file = os.path.join(_project_folder, p_tabl['Monetization file'][i])
-    _csv_stand_file = os.path.join(_project_folder, '{} Averaged stand data.csv'.format(_project_tag))
-    _csv_treatment_file = os.path.join(_project_folder, '{} Averaged treatment.csv'.format(_project_tag))
+    # _monetization_file = os.path.join(_project_folder, p_tabl['Monetization file'][i])  # not calculated in Python
+    _csv_stand_file = os.path.join(_project_folder, '{} Averaged stand data.csv'.format(_project_name))
+    _csv_treatment_file = os.path.join(_project_folder, '{} Averaged treatment.csv'.format(_project_name))
 
-    forest_types = [_x.strip() for _x in p_tabl['Forest types'][i].split(',')]
-    average_over_strings = [_x.strip() for _x in p_tabl['Average over stands'][i].split(',')]
-    print(p_tabl['Average over stands'][i])
-    if len(forest_types) != len(average_over_strings):
-        raise ValueError('Number of forest types ({}) is not the same as Average stands ({})'.format(
-            len(forest_types), len(average_over_strings)))
-    _average_over = {}
-    for j, f_type in enumerate(forest_types):
-        if _stand_id_key == 'Bestand':
-            _average_over[f_type] = [int(_x.strip()) for _x in average_over_strings[j].split(';')]
-        else:
-            _average_over[f_type] = [_x.strip() for _x in average_over_strings[j].split(';')]
+    _average_over, _active_prod_areas, _active_prod_areas_fract = fio.get_active_forests_from_stand(
+        _stand_file, stand_id_key=_stand_id_key)
 
     _result_sheets = \
-        ['{} {} {}'.format(_project_tag, _x, _y) for _x, _y in
+        ['{} {} {}'.format(_project_name, _x, _y) for _x, _y in
          zip(np.repeat(list(_average_over.keys()), 2), methods * len(_average_over))]
          # zip(np.repeat(list(_average_over.keys()), max(2, len(_average_over))), methods * len(_average_over))]
+
+    # We could extract the combine fractions directly from the stand file (Bestandsutvalg,
+    # through "fio.get_active_forests_from_stand()" above) because it should
+    # contain the areas/volumes of each of the different wood species
+    for key, value in _active_prod_areas.items():
+        print('{} stands have a total area of {} daa, which corresponds to a fraction of {:.3} of the total area'.format(
+            key, sum(value), _active_prod_areas_fract[key]))
+
+    _combine_sheets = {}
+    # _kwargs, combine_fractions = fio.get_kwargs_from_stand(_stand_file, _project_settings_file, _project_tag)
+    # forest_types = [_x.strip() for _x in p_tabl['Forest types'][i].split(',')] # From OLD projects.py
+
+    # With the new set-up (reading active productive area and fractions directly from Bestandsutvalg file)
+    combine_fractions = list(_active_prod_areas_fract.values())
+    forest_types = list(_active_prod_areas_fract.keys())
+
+    if len(combine_fractions) < 2:
+        # only one forest type to "combine", so no combination of forest types necessary,
+        # and the 'combine_fraction' is overridden using a factor of 1
+        _combine_fractions = [1.]
+    else:
+        _combine_fractions = combine_fractions
+
+    for j, method in enumerate(methods):
+        _this_list = []
+        for k, c_frac in enumerate(_combine_fractions):
+            _this_list.append(_result_sheets[j + 2 * k])
+            _this_list.append(c_frac)
+        _combine_sheets['{} Combined Stands {} {}'.format(_project_name, '-and-'.join(forest_types), method)] = \
+            _this_list
+
+    if not _fix_import:
+        return (_project_folder, _stand_file, _average_over, _stand_id_key, _result_file, _result_sheets,
+                _combine_sheets, None, _csv_stand_file, _csv_treatment_file, {})
 
     # Create empty QC folder if it doesn't exist from before
     if not os.path.exists(_qc_folder):
@@ -137,55 +165,27 @@ def project_settings(_project_tag, _project_settings_file):
             _ = wb.add_worksheet(_sheet)
         writer.close()
 
-    # XXX testing
-    # _kwargs, combine_fractions = fio.get_kwargs_from_stand(_stand_file, _project_settings_file, _project_tag)
-    _kwargs, combine_fractions = fio.get_kwargs_from_stand(_stand_file, _project_settings_file, _project_tag)
-
-    _combine_sheets = {}
-    if len(combine_fractions) < 2:
-        # only one forest type to "combine", so no combination of forest types necessary,
-        # and the 'combine_fraction' is overridden using a factor of 1
-        _combine_fractions = [1.]
-    else:
-        _combine_fractions = combine_fractions
-
-    for j, method in enumerate(methods):
-        _this_list = []
-        for k, c_frac in enumerate(_combine_fractions):
-            _this_list.append(_result_sheets[j + 2 * k])
-            _this_list.append(c_frac)
-        _combine_sheets['{} Combined Stands {} {}'.format(_project_tag, '-and-'.join(forest_types), method)] = \
-            _this_list
-
     return _project_folder, _stand_file, _average_over, _stand_id_key, _result_file, _result_sheets, _combine_sheets, \
-        _monetization_file, _csv_stand_file, _csv_treatment_file, _kwargs
+        None, _csv_stand_file, _csv_treatment_file, {}
 
 
 if __name__ == '__main__':
-    # project_tag = 'FHF23-999'
-    project_tag = 'FHF23-001'
+    project_name = 'FHF24-0027-01 Kambo'
     project_settings_file = 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx'
 
     # Set to False after Heureka simulation results have been saved in result_file, and you want to
     # rearrange the results so that they are easier to include in Excel calculations
-    fix_import = True
+    fix_import = False
 
     verbose = True
 
-    # You need to open the Monetization file in Excel, open "Manage Workbook Links", point to the correct
-    # "ProjectForestSettings" file, and save it, before Python can read it and create QC plots
-    # So set this to True after opening and saving the Monetization file,
-    monetization_file_has_been_opened_and_saved = False
-
     project_folder, stand_file, average_over, stand_id_key, result_file, result_sheets, combine_sheets, \
         monetization_file, csv_stand_file, csv_treatment_file, kwargs = \
-        project_settings(project_tag, project_settings_file)
+        project_settings(project_name, project_settings_file, fix_import)
 
     if fix_import:
-        arrange_import(stand_file, csv_stand_file, csv_treatment_file, average_over, stand_id_key, project_tag,
+        arrange_import(stand_file, csv_stand_file, csv_treatment_file, average_over, stand_id_key, project_name,
                        _verbose=verbose, **kwargs)
-    elif (not fix_import) and (not monetization_file_has_been_opened_and_saved):
+    elif not fix_import:
         arrange_results(result_file, result_sheets, combine_sheets, monetization_file, _verbose=verbose,  **kwargs)
-    elif monetization_file_has_been_opened_and_saved:
-        fio.qc_plots(monetization_file, project_tag)
 

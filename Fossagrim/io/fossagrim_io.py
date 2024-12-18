@@ -38,6 +38,13 @@ def example_gis_database():
     index = np.where(data['BEST_NR'] == 279.0)
 
 
+def my_float(x):
+    if isinstance(x, str):
+        return float(x.replace(',', '.'))
+    else:
+        return float(x)
+
+
 def get_row_index(table, key, item):
     """
     Returns the row index of the item
@@ -211,12 +218,15 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
     # Test if the excel file with Heureka results already contain Rearranged results
     wb = load_workbook(filename)
     if result_sheet_name in wb.sheetnames:
-        print("WARNING the sheet '{}' already exists in {}.".format(
+        print("WARNING the sheet '{}' already exists in {}. Remove it before trying again.".format(
             result_sheet_name,
             os.path.basename(filename)))
-        _ans = input("Do you want to overwrite that sheet? Y/[N]:")
-        if _ans.upper() == 'Y':
-            rearrange_result_file = True
+        # TODO
+        # The data in the old sheet is not removed before overwriting, so old data can hang on also after 'over writing'
+        # This needs to be fixed before allowing for overwrite
+        # _ans = input("Do you want to overwrite that sheet? Y/[N]:")
+        # if _ans.upper() == 'Y':
+        #     rearrange_result_file = True
     else:
         rearrange_result_file = True
 
@@ -719,6 +729,65 @@ def read_fossagrim_treatment(
                 if 'Planting' in line:
                     plant_density = float(split_line[8])
     return [thinning_year, final_felling_year, plant_density]
+
+
+def get_active_forests_from_stand(stand_file, stand_id_key=None, header=None, sheet_name=None):
+    """
+    Reads the stand file ("Bestandsutvalg") and finds out which forest stands are active and should be included,
+    their (dominant) wood species, and their respective active area and the
+
+    :param stand_file:
+    :param stand_id_key:
+    :param header:
+    :param sheet_name:
+    :return:
+    """
+    if stand_id_key is None:
+        stand_id_key = 'Bestand'
+    if sheet_name is None:
+        sheet_name = 0   # Reads only first sheet, opposite to pandas default were None reads all sheets.
+    if header is None:
+        header = 7
+
+    table = read_excel(stand_file, header, sheet_name)
+    if table is None:
+        print('WARNING, stands could not be loaded from {}'.format(stand_file))
+        return None
+
+    active_forests = {'Spruce': [], 'Pine': [], 'Birch': []}
+    active_prod_areal = {'Spruce': [], 'Pine': [], 'Birch': []}  # Unit daa in Bestandsutvalg
+    active_prod_areal_fractions = {}
+
+    for i, stand_id in enumerate(table[stand_id_key]):
+        this_wood_species = None
+        if table['Bonitering\ntreslag'][i] in ['Gran', 'G', 'Spruce']:
+            this_wood_species = 'Spruce'
+        elif table['Bonitering\ntreslag'][i] in ['Furu', 'F', 'Pine']:
+            this_wood_species = 'Pine'
+        elif table['Bonitering\ntreslag'][i] in ['Bjørk', 'B', 'Birch']:
+            this_wood_species = 'Birch'
+
+        if table['Volum status'][i] == 1:
+            active_forests[this_wood_species].append(stand_id)
+            active_prod_areal[this_wood_species].append(my_float(table['Prod.areal'][i]))
+
+    # Remove empty wood species from the active forests
+    for key in list(active_forests.keys()):
+        if len(active_forests[key]) == 0:
+            _ = active_forests.pop(key)
+            _ = active_prod_areal.pop(key)
+
+    # Calculate total active area, and the fraction of each wood species against the total
+    tot_area_per_species = {}
+    tot_area = 0.
+    for key in list(active_prod_areal.keys()):
+        this_sum = sum(active_prod_areal[key])
+        tot_area_per_species[key] = this_sum
+        tot_area += this_sum
+    for key in list(tot_area_per_species.keys()):
+        active_prod_areal_fractions[key] = tot_area_per_species[key] / tot_area
+
+    return active_forests, active_prod_areal, active_prod_areal_fractions
 
 
 def get_kwargs_from_stand_OLD(stand_file, project_settings_file, project_tag):
