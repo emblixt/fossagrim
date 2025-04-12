@@ -251,14 +251,14 @@ def qc_stand_data(stand_data_table, stand_id, qc_plot_dir):
     #fig4, axs4 = plt.subplots(13, 1, figsize=(8, 12))
     #fig4.subplots_adjust(hspace=0)
 
-
     i = 0
-    for _key in fossagrim_standdata_keys:
+    for _key in list(stand_data_table.keys())[:38]:
+    # for _key in fossagrim_standdata_keys:
         # The number 38 should reflect the part of the stand data table which contains the necessary data
-        if _key not in list(stand_data_table.keys())[:38]:
-            error_txt = 'ERROR! Necessary key {} is not in stand data table'.format(_key)
-            print(error_txt)
-            raise IOError(error_txt)
+        # if _key not in [_x.strip() for _x in list(stand_data_table.keys())[:38]]:
+        #    error_txt = 'ERROR! Necessary key {} is not in stand data table'.format(_key)
+        #    print(error_txt)
+        #    raise IOError(error_txt)
         # empty columns
         if 'Unnamed' in _key:
             continue

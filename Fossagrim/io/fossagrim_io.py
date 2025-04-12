@@ -391,8 +391,13 @@ def arrange_export_of_one_stand(row_index, table):
 
     # Now do the conversion from Fossagrim data and units to Heureka compatible data and units
     for key, value in list(keyword_arguments.items()):
-        if key in ['InventoryYear', 'N', 'CountyCode', 'SoilMoistureCode', 'VegetationType', 'Peat']:
-            keyword_arguments[key] = int(value)
+        if key in ['CountyCode']:
+            keyword_arguments[key] = 13
+        if key in ['InventoryYear', 'N', 'SoilMoistureCode', 'VegetationType', 'Peat']:
+            try:
+                keyword_arguments[key] = int(value)
+            except ValueError as err_msg:
+                print('For key {}: {}'.format(key, err_msg))
         if key == 'ProdArea':
             keyword_arguments[key] = value * 0.1  # from daa to ha
         if key == 'SiteIndexSpecies':
@@ -455,7 +460,7 @@ def average_over_stands(average_over, table, stand_id_key, average_name, verbose
     from Fossagrim.utils.definitions import fossagrim_keys_to_most_of as keys_to_most_of
 
     # create a new empty DataFrame that should hold the average values
-    avg_table = pd.DataFrame(columns=list(table.keys()))
+    avg_table = pd.DataFrame(columns=[_key.strip() for _key in list(table.keys())])
 
     for avg_group in average_over:
         if verbose:
@@ -475,22 +480,25 @@ def average_over_stands(average_over, table, stand_id_key, average_name, verbose
         total_area = np.sum(table['Prod.areal'][average_ind])
         # for key in fossagrim_standdata_keys:
         for key in list(table.keys()):
-            if key in ['Fossagrim ID', 'Bestand']:
+            if key.strip() in ['Fossagrim ID', 'Bestand']:
                 this_data = '{}{}'.format(average_name, avg_group)
                 if verbose:
                     print(' {}: {}'.format(key, this_data))
                 this_row_of_data.append(this_data)
-            elif key in keys_to_sum_over:
+            elif key.strip() in keys_to_sum_over:
                 this_data = np.sum(table[key][average_ind])
                 if verbose:
                     print(' Sum over: {}: {}'.format(key, this_data))
                 this_row_of_data.append(this_data)
-            elif key in keys_to_average_over:
+            elif key.strip() in keys_to_average_over:
+                print('XXX:', key, total_area)
+                print(' XX -', np.sum(table['Prod.areal'][average_ind]))
+                print(' XX -', np.sum(table[key][average_ind]))
                 this_data = np.sum(table['Prod.areal'][average_ind] * table[key][average_ind]) / total_area
                 if verbose:
                     print(' Average over:{}: {}'.format(key, this_data))
                 this_row_of_data.append(this_data)
-            elif key in keys_to_most_of:
+            elif key.strip() in keys_to_most_of:
                 # An area weighted 'most of' calculation
                 this_data = table[key][average_ind].array
                 area_weighted_average = np.sum(this_data * table['Prod.areal'][average_ind]) / total_area
@@ -704,7 +712,7 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
 def read_fossagrim_treatment(
         treatment_csv_file,
         project_tag,
-        wood_species = 'Spruce'):
+        wood_species='Spruce'):
     """
 
     :param treatment_csv_file:
@@ -1262,12 +1270,31 @@ def get_carbon_effect(result_file, stand_id,
         return None
 
 
-def collect_all_stand_data():
+def collect_all_stand_data(
+        base_dir=None,
+        dry_run=True
+):
+    """
+    Traverses the file structure for Heureka files and collects the stand data and selected Heureka
+     results in one csv file
+
+    :param base_dir:
+    :param dry_run:
+        bool
+        If True, not results are written, just checking for potential Heureka files
+    :return:
+    """
+    # TODO 1. Also collect info about DeadWood, Recreation index, total AREA preserved, and mean AGE
+    if base_dir is None:
+        base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger"
+
     from pathlib import Path
-    base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger"
-    out_file = os.path.join(base_dir, 'All stand data.csv')
-    # create header lines of out file
-    write_csv_file(out_file, heureka_standdata_keys, heureka_standdata_desc)
+    if not dry_run:
+        out_file = os.path.join(base_dir, 'All stand data.csv')
+        # create header lines of out file
+        write_csv_file(out_file, heureka_standdata_keys, heureka_standdata_desc)
+    else:
+        out_file = os.path.join(base_dir, 'TEST COLLECT STAND DATA.csv')
 
     file_list = Path(base_dir).rglob('*Averaged stand data.csv')
     with open(out_file, 'a') as _out:  # append
@@ -1283,26 +1310,29 @@ def collect_all_stand_data():
                     split_line = line.split(';')
                     if 'FHF' in split_line[0]:
                         print('  Searching for stand id: {}'.format(split_line[0]))
-                        carbon_effect = get_carbon_effect(
-                            heureka_result_file,
-                            split_line[0],
-                            save_plot_to= os.path.join(
-                                os.path.dirname(heureka_result_file), 'Net Carbon Effect {}.png'.format(split_line[0]))
-                        )
-                        if carbon_effect is None:
-                            alt_stand_id = split_line[0].replace('Avg Stand-', '')
-                            print('  Searching for alternative stand id: {}'.format(alt_stand_id))
+                        if not dry_run:
                             carbon_effect = get_carbon_effect(
                                 heureka_result_file,
-                                alt_stand_id,
+                                split_line[0],
                                 save_plot_to= os.path.join(
                                     os.path.dirname(heureka_result_file), 'Net Carbon Effect {}.png'.format(split_line[0]))
                             )
+                            if carbon_effect is None:
+                                alt_stand_id = split_line[0].replace('Avg Stand-', '')
+                                print('  Searching for alternative stand id: {}'.format(alt_stand_id))
+                                carbon_effect = get_carbon_effect(
+                                    heureka_result_file,
+                                    alt_stand_id,
+                                    save_plot_to= os.path.join(
+                                        os.path.dirname(heureka_result_file), 'Net Carbon Effect {}.png'.format(split_line[0]))
+                                )
 
-                        print('  ', carbon_effect)
-                        split_line[101] = str(carbon_effect)
-                        _out.write(';'.join(split_line))
-                        pass
+                            print('  ', carbon_effect)
+                            split_line[101] = str(carbon_effect)
+                            _out.write(';'.join(split_line))
+                            pass
+                        else:
+                            print('   - Dry run')
 
 
 def test_read_fossagrim_treatment():
@@ -1460,12 +1490,15 @@ def test_get_kwargs_from_stand():
 
 
 def test_get_carbon_effect():
-    result_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0016 Margrete Folsland\\FHF24-0016 Heureka results.xlsx"
-    project_tag = "FHF24-0016"
-    wood_species = "Pine"
+    # result_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0016 Margrete Folsland\\FHF24-0016 Heureka results.xlsx"
+    # project_tag = "FHF24-0016"
+    # wood_species = "Pine"
+    result_file ="C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0047 Åmli\\FHF24-0047 v01 Heureka results.xlsx"
+    project_tag = "FHF24-0047 v01 Pine"
     save_plot_to = result_file.replace("xlsx", "png")
     print(save_plot_to)
-    avg = get_carbon_effect(result_file, project_tag, wood_species=wood_species, save_plot_to=save_plot_to)
+    # avg = get_carbon_effect(result_file, project_tag, wood_species=wood_species, save_plot_to=save_plot_to)
+    avg = get_carbon_effect(result_file, project_tag, save_plot_to=save_plot_to)
     print(avg)
     plt.show()
 
@@ -1479,6 +1512,6 @@ if __name__ == '__main__':
     # test_modify_monetization_file()
     # test_read_raw_heureka_results()
     # test_get_kwargs_from_stand()
-    # test_get_carbon_effect()
+    test_get_carbon_effect()
     # test_read_fossagrim_treatment()
-    collect_all_stand_data()
+    # collect_all_stand_data()

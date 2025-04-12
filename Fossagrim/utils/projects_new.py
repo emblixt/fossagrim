@@ -13,7 +13,7 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
                    _verbose=False, **_kwargs):
 
     # QC input table
-    table = fio.read_excel(_stand_file, 7, 0)
+    table = fio.read_excel(_stand_file, 7, 'data')
     fpp.qc_stand_data(
         table,
         os.path.basename(_stand_file),
@@ -26,6 +26,7 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
         average_over=_average_over,
         stand_id_key=_stand_id_key,
         average_name='{} '.format(_project_tag),
+        sheet_name='data',
         verbose=_verbose
     )
 
@@ -36,7 +37,8 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
         _csv_treatment_file,
         average_over=_average_over,
         stand_id_key=_stand_id_key,
-        average_name='{} '.format(_project_tag)
+        average_name='{} '.format(_project_tag),
+        sheet_name='data'
     )
 
 
@@ -51,7 +53,7 @@ def arrange_results(_result_file, _sheet_names, _combine_sheets, _monetization_f
         fio.modify_monetization_file(_monetization_file, **_kwargs)
 
 
-def project_settings(_project_name, _project_settings_file, _fix_import: bool = True):
+def project_settings(_project_name, _project_settings_file, _fix_import: bool = True, _verbose: bool = False):
     """
     Reads the project settings Excel file, and extracts information from it to be used in the Heureka simulation
     and sets up files necessary for storing results and monetization calculations for the given project
@@ -83,7 +85,7 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
             continue
         if p_tabl['Status'][i] not in ['Active', 'Prospective']:
             continue
-        if _project_name in p_name.strip():
+        if _project_name == p_name.strip():
             tag_found = True
             break
 
@@ -91,6 +93,18 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
         raise IOError('Project name {} not found in {}'.format(
             _project_name, os.path.basename(_project_settings_file)
         ))
+
+    if _verbose:
+        if _fix_import:
+            print('Preparing import for project {} using projects settings from {}'.format(
+                _project_name, _project_settings_file
+            ))
+            print('Using project folder {},\n with stand ID key {},\n and stand file {},\n '
+                  'to create the empty results file {}'.format(
+                p_tabl['Project folder'][i],
+                p_tabl['Stand id key'][i],
+                p_tabl['Stands file'][i],
+                p_tabl['Results file'][i]))
 
     _project_folder = p_tabl['Project folder'][i]
     _qc_folder = os.path.join(_project_folder, 'QC_plots')
@@ -102,10 +116,16 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
     _csv_treatment_file = os.path.join(_project_folder, '{} Averaged treatment.csv'.format(_project_name))
 
     _average_over, _active_prod_areas, _active_prod_areas_fract = fio.get_active_forests_from_stand(
-        _stand_file, stand_id_key=_stand_id_key)
+        _stand_file, stand_id_key=_stand_id_key, sheet_name='data')
 
+    # Excel can only handle sheet names that are shorter than 31 characters, and the longest string
+    # we add is "Spruce PRES", which is 11 characters long.
+    if len(_project_name) >= 20:
+        tmp_project_name = _project_name[:10]
+    else:
+        tmp_project_name = _project_name
     _result_sheets = \
-        ['{} {} {}'.format(_project_name, _x, _y) for _x, _y in
+        ['{} {} {}'.format(tmp_project_name, _x, _y) for _x, _y in
          zip(np.repeat(list(_average_over.keys()), 2), methods * len(_average_over))]
          # zip(np.repeat(list(_average_over.keys()), max(2, len(_average_over))), methods * len(_average_over))]
 
@@ -170,18 +190,18 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
 
 
 if __name__ == '__main__':
-    project_name = 'FHF24-0027-01 Kambo'
+    project_name = 'FHF24-0047 v01'
     project_settings_file = 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx'
 
     # Set to False after Heureka simulation results have been saved in result_file, and you want to
-    # rearrange the results so that they are easier to include in Excel calculations
+    # rearrange the results so that they are easier to include in climate benefit calculations
     fix_import = False
 
     verbose = True
 
     project_folder, stand_file, average_over, stand_id_key, result_file, result_sheets, combine_sheets, \
         monetization_file, csv_stand_file, csv_treatment_file, kwargs = \
-        project_settings(project_name, project_settings_file, fix_import)
+        project_settings(project_name, project_settings_file, fix_import, verbose)
 
     if fix_import:
         arrange_import(stand_file, csv_stand_file, csv_treatment_file, average_over, stand_id_key, project_name,
