@@ -177,8 +177,8 @@ heureka_standdata_keys = heureka_mandatory_standdata_keys + [
     'UserDefinedVariable3_ThinningYear',
     'UserDefinedVariable4_PlantDensity',
     'UserDefinedVariable5_ClimateEffect',
-    'UserDefinedVariable6',
-    'UserDefinedVariable7',
+    'UserDefinedVariable6_DeadWoodEffect',
+    'UserDefinedVariable7_RecreationEffect',
     'UserDefinedVariable8',
     'UserDefinedVariable9',
     'UserDefinedVariable10',
@@ -196,8 +196,10 @@ heureka_standdata_desc = [
     'Volym (m3sk/ha. produktiv areal)',
     '','','','','','','','','','','','','','','','','','','','','','','','','','', '','','','',
     '','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','',
-    '','','','','','','','','','','','År','År','Planter/ha','Sum of diff. in Total carbon (PRES-BAU) over 30 yrs',
-    '','','','','',''
+    '','','','','','','','','','','','År','År','Planter/ha',
+    '30 yrs sum of diff. in Total carbon (PRES-BAU), ignoring Soil. ton C/ha',
+    '30 yrs sum of diff. in Deadwood >= 20cm (PRES-BAU), m3/h',
+    '30 yrs sum of diff. in Recreation Index After (PRES-BAU)','','','',''
 ]
 
 heureka_treatment_keys = [

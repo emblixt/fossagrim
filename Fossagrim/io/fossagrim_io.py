@@ -3,14 +3,15 @@ import openpyxl
 import pandas as pd
 import numpy as np
 import os
+import unittest
 
 from Fossagrim.utils.definitions import heureka_mandatory_standdata_keys, \
     heureka_standdata_keys, heureka_standdata_desc, \
     heureka_treatment_keys, heureka_treatment_desc, \
-    fossagrim_standdata_keys, m3fub_to_m3sk,\
+    fossagrim_standdata_keys, m3fub_to_m3sk, \
     translate_keys_from_fossagrim_to_heureka
 from Fossagrim.utils.monetization_parameters import \
-    parameters, variables_used_in_monetization, calculation_part1, resampled_section,\
+    parameters, variables_used_in_monetization, calculation_part1, resampled_section, \
     money_value, cbo_flow, project_benefits, buffer, fossagrim_values, forest_owner_values
 
 import Fossagrim.plotting.misc_plots as fpp
@@ -43,6 +44,13 @@ def my_float(x):
         return float(x.replace(',', '.'))
     else:
         return float(x)
+
+
+def my_str(x):
+    if x is None:
+        return ''
+    else:
+        return str(x)
 
 
 def get_row_index(table, key, item):
@@ -107,11 +115,11 @@ def write_csv_file(write_to_file, default_keys, default_desc, append=False, **kw
     # overwrite any existing file, and create the header.
     if not append:
         with open(write_to_file, 'w') as f:
-            f.write(';'.join(default_desc)+'\n')
-            f.write(';'.join(default_keys)+'\n')
+            f.write(';'.join(default_desc) + '\n')
+            f.write(';'.join(default_keys) + '\n')
 
     # arrange the data from kwargs
-    data = ['']*len(default_keys)
+    data = [''] * len(default_keys)
     for key in kwargs:
         if key not in default_keys:
             print('WARNING: key "{}" not found in accepted default keys'.format(key))
@@ -126,7 +134,7 @@ def write_csv_file(write_to_file, default_keys, default_desc, append=False, **kw
     # append the data
     if len(kwargs) > 0:  # only write data if given
         with open(write_to_file, 'a') as f:
-            f.write(';'.join(data)+'\n')
+            f.write(';'.join(data) + '\n')
 
 
 def read_raw_heureka_results(filename, sheet_name, read_only_these_variables=None, verbose=False):
@@ -150,7 +158,11 @@ def read_raw_heureka_results(filename, sheet_name, read_only_these_variables=Non
     table = read_excel(filename, 0, sheet_name)
     # Some treatments in Heureka break the default periods of 5 years into smaller sub-periods, we choose to remove
     # these from the returned dataframe
-    year_row = get_row_index(table, 'Variable', 'Year')
+    try:
+        year_row = get_row_index(table, 'Variable', 'Year')
+    except KeyError as error:
+        print('Variable Year not in file! ', error)
+        return None
     five_years = [np.mod(this_year, 5) == 0 for this_year in table.iloc[year_row, 3:]]
     # print(table.iloc[year_row, 3:][five_years])
     data_dict = {}
@@ -182,6 +194,41 @@ def read_raw_heureka_results(filename, sheet_name, read_only_these_variables=Non
     result = pd.DataFrame(data=data_dict)
     result.attrs = unit_dict
     return result
+
+
+def combine_raw_heureka_results(filename, sheet_name, function, variables, verbose=False):
+    """
+    Uses read_heureka_results() to load all variables from a raw Heureka result,
+    then combines the variables according to the input function, eg:
+    > variables = {'x': 'Total Carbon Stock (dead wood, soil, trees, stumps and roots)',
+                   'y': 'Soil Carbon Stock',
+                   'z': 'XXX', ...}
+    > def func(x, y, z):
+        return x - y + 10. * z - 19.
+    > combine_raw_heureka_results(filename, sheet_name, func, variables)
+
+    THUS, the variables dictionary must have the same number of elements as the input function has parameters
+    :param filename:
+    :param sheet_name:
+    :param function:
+        function
+        E.G.
+        > def my_func(x, y):
+        >   return x - y
+    :param variables
+        dict
+        Dictionary of variable where each key is a parameter in the input function (e.g. 'x') and the
+        value is the name of variable (column) in the raw heureka results file (e.g. 'Soil Carbon Stock')
+        E.G.
+        {'x': 'Total Carbon Stock (dead wood, soil, trees, stumps and roots)',
+         'y': 'Soil Carbon Stock'}
+    :param verbose:
+    :return:
+    """
+    data = read_raw_heureka_results(filename, sheet_name, verbose=verbose)
+    _variables = {_key: data[variables[_key]] for _key in list(variables.keys())}
+
+    return function(**_variables)
 
 
 def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetization_file=None, verbose=False):
@@ -308,7 +355,8 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
 
             if write_monetization_file:
                 _start_col = 0 + (i + 0) * (len(list(combined_table.keys())) + 2)
-                with pd.ExcelWriter(monetization_file, mode='a', if_sheet_exists='overlay', engine='openpyxl') as writer:
+                with pd.ExcelWriter(monetization_file, mode='a', if_sheet_exists='overlay',
+                                    engine='openpyxl') as writer:
                     combined_table.to_excel(writer, sheet_name=result_sheet_name, startcol=_start_col, startrow=2)
 
                 wb = load_workbook(monetization_file)
@@ -410,7 +458,7 @@ def arrange_export_of_one_stand(row_index, table):
             else:
                 raise NotImplementedError('Species "{}" is not recognized as either Gran or Furu'.format(value))
         if key == 'V':
-            keyword_arguments[key] = value * 10. * m3fub_to_m3sk # m3fub/daa to m3sk/ha
+            keyword_arguments[key] = value * 10. * m3fub_to_m3sk  # m3fub/daa to m3sk/ha
         if key == 'N':
             keyword_arguments[key] = value * 10.  # trees/mål to trees/ha
         if key == 'PlantDensity':
@@ -503,7 +551,7 @@ def average_over_stands(average_over, table, stand_id_key, average_name, verbose
                 this_data = table[key][average_ind].array
                 area_weighted_average = np.sum(this_data * table['Prod.areal'][average_ind]) / total_area
                 # index of original data closest to the average
-                ind = np.argmin((this_data - area_weighted_average)**2)
+                ind = np.argmin((this_data - area_weighted_average) ** 2)
                 if verbose:
                     print(' Most of: {}: {}'.format(key, this_data[ind]))
                 this_row_of_data.append(this_data[ind])
@@ -568,7 +616,7 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
     if stand_id_key is None:
         stand_id_key = 'Bestand'
     if sheet_name is None:
-        sheet_name = 0   # Reads only first sheet, opposite to pandas default were None reads all sheets.
+        sheet_name = 0  # Reads only first sheet, opposite to pandas default were None reads all sheets.
     if header is None:
         header = 7
 
@@ -583,8 +631,9 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
     if (average_over is not None) and isinstance(average_over, dict):  # export averaged stands
         this_stand_only = None
         table = average_over_stands(average_over, table, stand_id_key, average_name, verbose=verbose)
-        notes = ['Area weighted average for {} of stands {}'.format(_key, ', '.join([str(_x) for _x in average_over[_key]]))
-                 for _key in list(average_over.keys())]
+        notes = [
+            'Area weighted average for {} of stands {}'.format(_key, ', '.join([str(_x) for _x in average_over[_key]]))
+            for _key in list(average_over.keys())]
 
     number_of_stands_written = 0
     for i, stand_id in enumerate(table[stand_id_key]):
@@ -648,7 +697,7 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
     if stand_id_key is None:
         stand_id_key = 'Bestand'
     if sheet_name is None:
-        sheet_name = 0   # Reads only first sheet, opposite to pandas default were None reads all sheets.
+        sheet_name = 0  # Reads only first sheet, opposite to pandas default were None reads all sheets.
     if header is None:
         header = 7
     if average_name is None:
@@ -671,11 +720,12 @@ def export_fossagrim_treatment(read_from_file, write_to_file, this_stand_only=No
     if (average_over is not None) and isinstance(average_over, dict):  # export averaged stands
         this_stand_only = None
         table = average_over_stands(average_over, table, stand_id_key, average_name)
-        notes = ['Area weighted average for {} of stands {}'.format(_key, ', '.join([str(_x) for _x in average_over[_key]]))
-                 for _key in list(average_over.keys())]
+        notes = [
+            'Area weighted average for {} of stands {}'.format(_key, ', '.join([str(_x) for _x in average_over[_key]]))
+            for _key in list(average_over.keys())]
 
     for i, stand_id in enumerate(table[stand_id_key]):
-        if (table['Bonitering\ntreslag'][i] in ['Uproduktiv', '-']): # or np.isnan(table['HovedNr'][i]):
+        if (table['Bonitering\ntreslag'][i] in ['Uproduktiv', '-']):  # or np.isnan(table['HovedNr'][i]):
             continue
         if (this_stand_only is not None) and (this_stand_only != stand_id):
             continue
@@ -753,7 +803,7 @@ def get_active_forests_from_stand(stand_file, stand_id_key=None, header=None, sh
     if stand_id_key is None:
         stand_id_key = 'Bestand'
     if sheet_name is None:
-        sheet_name = 0   # Reads only first sheet, opposite to pandas default were None reads all sheets.
+        sheet_name = 0  # Reads only first sheet, opposite to pandas default were None reads all sheets.
     if header is None:
         header = 7
 
@@ -930,7 +980,7 @@ def get_kwargs_from_stand(stand_file, project_settings_file, project_tag):
         # UPDATE! If I open the linked file (ProjectForestSettings - WIP.xlsx) the linking works:-)
         kwargs[_key] = "='[{}]Settings'!${}${}".format(
             os.path.basename(project_settings_file),
-            _kwarg_direct_keys[_key], i+3)  # +3 because 2 header lines and python starts counting at 0
+            _kwarg_direct_keys[_key], i + 3)  # +3 because 2 header lines and python starts counting at 0
     wb.close()
 
     if None in combine_fractions:
@@ -968,11 +1018,11 @@ def modify_monetization_file(write_to_file, **_kwargs):
     wb = openpyxl.load_workbook(write_to_file)
 
     ws = wb['Monetization']
-    ws['F1'].value = _kwargs['Position of total area']/10.  # from mål to Ha
+    ws['F1'].value = _kwargs['Position of total area'] / 10.  # from mål to Ha
     ws['AF3'].value = _kwargs['Position of Batch 1 total volume']
     ws['AG3'].value = _kwargs['Position of Batch 2 total volume']
     ws['AI3'].value = _kwargs['Position of Batch 1 total volume'] + _kwargs['Position of Batch 2 total volume'] + \
-        _kwargs['Position of passive forest total volume']
+                      _kwargs['Position of passive forest total volume']
     ws['AF5'].value = _kwargs['Batch 1 start date']
     ws['AG6'].value = _kwargs['Batch 2 delay']
     ws['AF8'].value = _kwargs['Root net']
@@ -1053,7 +1103,7 @@ def style_monetization_file(write_to_file):
 
     for _pos in ['AF5', 'AG5', 'AK4', 'AL4']:
         ws[_pos].style = 'date_style'
-    for _pos in ['AF4', 'AG4', 'AH4', 'AI4', 'AK3', 'AL3', 'AM3',  'AO4', 'AP4', 'AQ4', 'AX4', 'BM2', 'BP3']:
+    for _pos in ['AF4', 'AG4', 'AH4', 'AI4', 'AK3', 'AL3', 'AM3', 'AO4', 'AP4', 'AQ4', 'AX4', 'BM2', 'BP3']:
         ws[_pos].number_format = '0.0%'
     for _row in np.arange(8, 109):
         ws['BK{}'.format(_row)].number_format = '0.0%'
@@ -1069,7 +1119,7 @@ def style_monetization_file(write_to_file):
                 for my_cell in my_row:
                     my_cell.fill = PatternFill(patternType='solid', fgColor=color)
 
-    for my_cell_pos in ['A5', 'B5', 'F1', 'F2', 'AF3', 'AG3', 'AI3', 'AF5', 'AF8', 'AG6', 'AN4','AO4','AP4',
+    for my_cell_pos in ['A5', 'B5', 'F1', 'F2', 'AF3', 'AG3', 'AI3', 'AF5', 'AF8', 'AG6', 'AN4', 'AO4', 'AP4',
                         'AQ4', 'AT4', 'AX4', 'AY4', 'BH8', 'BI8', 'BP3']:
         ws[my_cell_pos].fill = no_fill
         ws[my_cell_pos].border = all_border
@@ -1184,7 +1234,7 @@ def qc_plots(monetization_file, project_tag, plot_dir=None):
         ax.set_title('{} Overview'.format(project_tag))
         ax.set_xlabel('Year')
         ax.set_ylabel(overview_unit)
-        ax.set_xlim(np.nanmin(x)-5, np.nanmin(x) + 155)
+        ax.set_xlim(np.nanmin(x) - 5, np.nanmin(x) + 155)
         ax.legend()
         ax.grid(True)
         fig.savefig(os.path.join(qc_plot_dir, '{} overview.png'.format(project_tag)))
@@ -1219,6 +1269,85 @@ def qc_plots(monetization_file, project_tag, plot_dir=None):
     # resampled_climate_benefit()
     overview()
     # farmed_offsets()
+
+
+def get_nature_and_climate_effect(result_file, stand_id, average_years=None, verbose=False):
+    """
+    Calculates the difference in predefined climate and nature parameters, between PRES and BAU,
+    and integrates the result over the given number of years
+    :param result_file:
+         str
+         Name of excel file that contain the "raw" Heureka results
+    :param stand_id
+         str
+    :param average_years:
+         int
+         Number of years to calculate the integrated effect over
+    """
+    if average_years is None:
+        average_years = 30
+
+    # Heureka runs the simulation using timesteps which are 5 years long
+    i = int(np.floor(average_years / 5))
+    if verbose:
+        print('average_years: {} corresponds to {} periods'.format(average_years, i))
+
+    pres = None
+    bau = None
+
+    try:
+        pres = read_raw_heureka_results(result_file, '{} {}'.format(stand_id, 'PRES'), verbose=verbose)
+        if pres is None:
+            raise ValueError('Missing Year variable')
+    except ValueError as error:
+        print(error)
+        return None, None, None
+
+    try:
+        bau = read_raw_heureka_results(result_file, '{} {}'.format(stand_id, 'BAU'), verbose=verbose)
+        if bau is None:
+            raise ValueError('Missing Year variable')
+    except ValueError as error:
+        print(error)
+        return None, None, None
+
+    _c_diff = pres['Total Carbon Stock (dead wood, soil, trees, stumps and roots)'].values - pres['Soil Carbon Stock'].values - \
+             bau['Total Carbon Stock (dead wood, soil, trees, stumps and roots)'].values + bau['Soil Carbon Stock'].values
+    if verbose:
+        print('Variables to sum over:')
+        print('  Carbon (neglecting soil):', _c_diff[:i])
+        # print('   Total carbon stock PRES:', pres['Total Carbon Stock (dead wood, soil, trees, stumps and roots)'][:i].values)
+        # print('   Total carbon stock BAU:', bau['Total Carbon Stock (dead wood, soil, trees, stumps and roots)'][:i].values)
+    c_diff = np.sum(_c_diff[:i])
+
+    r_name = 'Recreation Index After'
+    d_name1 = 'Dead Standing Trees >=20cm'
+    d_name2 = 'Downed Deadwood >=20cm'
+
+    if r_name in list(pres.keys()):
+        _r_diff = pres[r_name].values - bau[r_name].values
+        if verbose:
+            print('  Recreation index:', _r_diff[:i])
+            # print('   Recreation index PRES:', pres[r_name][:i].values)
+            # print('   Recreation index BAU:',  bau[r_name][:i].values)
+        r_diff = np.sum(_r_diff[:i])
+    else:
+        r_diff = None
+
+    if d_name1 in list(pres.keys()):
+        # _test = pres[d_name1].values + pres[d_name2].values - bau[d_name1].values - bau[d_name2].values
+        _d_diff = pres[d_name1].values + pres[d_name2].values - bau[d_name1].values - bau[d_name2].values
+        # _d_diff = pres[d_name1] + pres[d_name2] - bau[d_name1] - bau[d_name2]
+        d_diff = np.sum(_d_diff[:i])
+        if verbose:
+            print('  Dead wood >= 20cm:', _d_diff[:i])
+            # print('   TEST: ', _test[:i])
+            # print('   Standing Dead wood PRES:', pres[d_name1][:i].values)
+            # print('   Standing Dead wood BAU:', bau[d_name1][:i].values)
+    else:
+        d_diff = None
+
+    return c_diff, d_diff, r_diff
 
 
 def get_carbon_effect(result_file, stand_id,
@@ -1271,6 +1400,7 @@ def get_carbon_effect(result_file, stand_id,
 
 
 def collect_all_stand_data(
+        out_file=None,
         base_dir=None,
         dry_run=True
 ):
@@ -1278,23 +1408,30 @@ def collect_all_stand_data(
     Traverses the file structure for Heureka files and collects the stand data and selected Heureka
      results in one csv file
 
+    out_file:
+        str
+        Full file name of output file
     :param base_dir:
+        Path to directory where Heureka modelling results are stored (in sub folders of base_dir)
     :param dry_run:
         bool
         If True, not results are written, just checking for potential Heureka files
     :return:
     """
-    # TODO 1. Also collect info about DeadWood, Recreation index, total AREA preserved, and mean AGE
+    # TODO Use this script to collect treatment too
     if base_dir is None:
         base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger"
 
     from pathlib import Path
-    if not dry_run:
-        out_file = os.path.join(base_dir, 'All stand data.csv')
-        # create header lines of out file
-        write_csv_file(out_file, heureka_standdata_keys, heureka_standdata_desc)
-    else:
+    if dry_run and out_file is None:
         out_file = os.path.join(base_dir, 'TEST COLLECT STAND DATA.csv')
+
+    if out_file is None:
+        raise IOError('Name of output file must be given')
+
+    # Creates a new Heureka compatible csv file for storing the data
+    if not dry_run:
+        write_csv_file(out_file, heureka_standdata_keys, heureka_standdata_desc, append=False)
 
     file_list = Path(base_dir).rglob('*Averaged stand data.csv')
     with open(out_file, 'a') as _out:  # append
@@ -1304,214 +1441,296 @@ def collect_all_stand_data(
             heureka_result_file = str(stand_file).replace('Averaged stand data.csv', 'Heureka results.xlsx')
             if os.path.isfile(heureka_result_file):
                 print(' Heureka result file exists')
+            else:
+                continue
 
             with open(stand_file, 'r') as _in:
                 for line in _in.readlines():
                     split_line = line.split(';')
                     if 'FHF' in split_line[0]:
                         print('  Searching for stand id: {}'.format(split_line[0]))
-                        if not dry_run:
-                            carbon_effect = get_carbon_effect(
+                        carbon_effect, dead_wood_effect, recreation_effect = get_nature_and_climate_effect(
+                            heureka_result_file,
+                            split_line[0]
+                        )
+                        if carbon_effect is None:
+                            alt_stand_id = split_line[0].replace('Avg Stand-', '')
+                            print('  Searching for alternative stand id: {}'.format(alt_stand_id))
+                            carbon_effect, dead_wood_effect, recreation_effect = get_nature_and_climate_effect(
                                 heureka_result_file,
-                                split_line[0],
-                                save_plot_to= os.path.join(
-                                    os.path.dirname(heureka_result_file), 'Net Carbon Effect {}.png'.format(split_line[0]))
+                                alt_stand_id
                             )
-                            if carbon_effect is None:
-                                alt_stand_id = split_line[0].replace('Avg Stand-', '')
-                                print('  Searching for alternative stand id: {}'.format(alt_stand_id))
-                                carbon_effect = get_carbon_effect(
-                                    heureka_result_file,
-                                    alt_stand_id,
-                                    save_plot_to= os.path.join(
-                                        os.path.dirname(heureka_result_file), 'Net Carbon Effect {}.png'.format(split_line[0]))
-                                )
-
-                            print('  ', carbon_effect)
-                            split_line[101] = str(carbon_effect)
+                        print('  ', carbon_effect)
+                        split_line[101] = my_str(carbon_effect)
+                        split_line[102] = my_str(dead_wood_effect)
+                        split_line[103] = my_str(recreation_effect)
+                        if not dry_run:
                             _out.write(';'.join(split_line))
-                            pass
                         else:
                             print('   - Dry run')
 
 
-def test_read_fossagrim_treatment():
-    file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0014 Arne Tag\\FHF24-0014 Averaged treatment.csv"
-    print(read_fossagrim_treatment(file, 'FHF24-0014', 'Spruce'))
-    print(read_fossagrim_treatment(file, 'FHF24-0014', 'Rubbish'))
+def collect_all_stand_data_OLD(
+        out_file=None,
+        base_dir=None,
+        dry_run=True
+):
+    """
+    Traverses the file structure for Heureka files and collects the stand data and selected Heureka
+     results in one csv file
+
+    out_file:
+        str
+        Full file name of output file
+    :param base_dir:
+        Path to directory where Heureka modelling results are stored (in sub folders of base_dir)
+    :param dry_run:
+        bool
+        If True, not results are written, just checking for potential Heureka files
+    :return:
+    """
+    if base_dir is None:
+        base_dir = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger"
+
+    if dry_run:
+        # Create axes for plotting nothing
+        fig, ax = plt.subplots()
+    else:
+        # get_carbon_effect() creates a new plot for each stand
+        ax = None
+
+    from pathlib import Path
+    if dry_run and out_file is None:
+        out_file = os.path.join(base_dir, 'TEST COLLECT STAND DATA.csv')
+
+    if out_file is None:
+        raise IOError('Name of output file must be given')
+
+    file_list = Path(base_dir).rglob('*Averaged stand data.csv')
+    with open(out_file, 'a') as _out:  # append
+        for stand_file in file_list:
+            print('Working on {}'.format(stand_file.name))
+            # see if there is a related Heureka results file
+            heureka_result_file = str(stand_file).replace('Averaged stand data.csv', 'Heureka results.xlsx')
+            if os.path.isfile(heureka_result_file):
+                print(' Heureka result file exists')
+            else:
+                continue
+
+            with open(stand_file, 'r') as _in:
+                for line in _in.readlines():
+                    split_line = line.split(';')
+                    if 'FHF' in split_line[0]:
+                        print('  Searching for stand id: {}'.format(split_line[0]))
+                        if dry_run:
+                            save_plot = None
+                        else:
+                            save_plot = os.path.join(
+                                os.path.dirname(heureka_result_file),
+                                'Net Carbon Effect {}.png'.format(split_line[0]))
+
+                        carbon_effect = get_carbon_effect(
+                            heureka_result_file,
+                            split_line[0],
+                            ax=ax,
+                            save_plot_to=save_plot
+                        )
+                        if carbon_effect is None:
+                            alt_stand_id = split_line[0].replace('Avg Stand-', '')
+                            print('  Searching for alternative stand id: {}'.format(alt_stand_id))
+                            carbon_effect = get_carbon_effect(
+                                heureka_result_file,
+                                alt_stand_id,
+                                ax=ax,
+                                save_plot_to=save_plot
+                            )
+
+                        print('  ', carbon_effect)
+                        split_line[101] = str(carbon_effect)
+                        if not dry_run:
+                            _out.write(';'.join(split_line))
+                        else:
+                            print('   - Dry run')
 
 
-def test_read_raw_heureka_results():
-    file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Heureka results.xlsx"
-    sheet_name = 'FHF23-999 Avg Stand-Pine PRES'
-    result = read_raw_heureka_results(file, sheet_name, variables_used_in_monetization, False)
-    print(result)
+class TestCases(unittest.TestCase):
+    def test_read_fossagrim_treatment(self):
+        file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0014 Arne Tag\\FHF24-0014 Averaged treatment.csv"
+        print(read_fossagrim_treatment(file, 'FHF24-0014', 'Spruce'))
+        print(read_fossagrim_treatment(file, 'FHF24-0014', 'Rubbish'))
 
+    def test_read_raw_heureka_results(self):
+        file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Heureka results.xlsx"
+        sheet_name = 'FHF23-999 Pine BAU'
+        result = read_raw_heureka_results(file, sheet_name, variables_used_in_monetization, False)
+        print(result.keys())
+        print(result)
 
-def test_modify_monetization_file():
-    mf = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\Test Monetization.xlsx"
-    sf = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Bestandsutvalg.xlsx"
-    pf = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings - WIP.xlsx"
-    tag = 'FHF23-999'
+    def test_modify_monetization_file(self):
+        mf = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\Test Monetization.xlsx"
+        sf = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Bestandsutvalg.xlsx"
+        pf = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings - WIP.xlsx"
+        tag = 'FHF23-999'
 
-    # Create empty monetization file
-    writer = pd.ExcelWriter(mf, engine='xlsxwriter')
-    wb = writer.book
-    writer.close()
+        # Create empty monetization file
+        writer = pd.ExcelWriter(mf, engine='xlsxwriter')
+        wb = writer.book
+        writer.close()
 
-    _kwargs, combine_fractions = get_kwargs_from_stand(sf, pf, tag)
+        _kwargs, combine_fractions = get_kwargs_from_stand(sf, pf, tag)
 
-    modify_monetization_file(mf, **_kwargs)
+        modify_monetization_file(mf, **_kwargs)
 
+    def test_write_excel_with_equations(self):
+        from openpyxl import load_workbook
+        from openpyxl.styles import PatternFill
+        from openpyxl.styles import Alignment
 
-def test_write_excel_with_equations():
-    from openpyxl import load_workbook
-    from openpyxl.styles import PatternFill
-    from openpyxl.styles import Alignment
+        colors = ['00660066', '00FFFFCC',
+                  '00FF0000', '0000FF00', '00660066']
+        fillers = []
 
-    colors = ['00660066', '00FFFFCC',
-              '00FF0000', '0000FF00', '00660066']
-    fillers = []
+        for color in colors:
+            temp = PatternFill(patternType='solid',
+                               fgColor=color)
+            fillers.append(temp)
 
-    for color in colors:
-        temp = PatternFill(patternType='solid',
-                           fgColor=color)
-        fillers.append(temp)
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        efile = os.path.join(dir_path, 'test.xlsx')
+        sheet_names = ['One', 'Two', 'Three']
 
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    efile = os.path.join(dir_path, 'test.xlsx')
-    sheet_names = ['One', 'Two', 'Three']
+        writer = pd.ExcelWriter(efile, engine='xlsxwriter')
+        wb = writer.book
+        for sheet in sheet_names:
+            ws = wb.add_worksheet(sheet)
+        writer.close()
 
-    writer = pd.ExcelWriter(efile, engine='xlsxwriter')
-    wb = writer.book
-    for sheet in sheet_names:
-        ws = wb.add_worksheet(sheet)
-    writer.close()
+        wb = load_workbook(efile)
+        ws = wb['Three']
+        ws.cell(1, 1).value = 'Constant'
+        ws.cell(1, 2).value = 4
 
-    wb = load_workbook(efile)
-    ws = wb['Three']
-    ws.cell(1, 1).value = 'Constant'
-    ws.cell(1, 2).value = 4
+        ws = wb['Two']
+        ws.cell(1, 1).value = '=One!A1*One!B1'
+        ws.cell(1, 2).value = '=One!A1*Three!$B$1'
+        for i in range(4):
+            ws.cell(i + 2, 1).value = '=One!A{}*One!B{}'.format(i + 2, i + 2)
+            ws.cell(i + 2, 2).value = '=One!A{}*Three!$B$1'.format(i + 2)
+            ws.cell(i + 2, 1).fill = fillers[0]
+            ws.cell(i + 2, 2).fill = fillers[1]
+        for my_row in ws['C6:D12']:
+            for my_cell in my_row:
+                my_cell.fill = fillers[3]
 
-    ws = wb['Two']
-    ws.cell(1, 1).value = '=One!A1*One!B1'
-    ws.cell(1, 2).value = '=One!A1*Three!$B$1'
-    for i in range(4):
-        ws.cell(i+2, 1).value = '=One!A{}*One!B{}'.format(i+2, i+2)
-        ws.cell(i + 2, 2).value = '=One!A{}*Three!$B$1'.format(i + 2)
-        ws.cell(i+2, 1).fill = fillers[0]
-        ws.cell(i + 2, 2).fill = fillers[1]
-    for my_row in ws['C6:D12']:
-        for my_cell in my_row:
-            my_cell.fill = fillers[3]
+        ws.cell(1, 4).value = 'TEST'
+        ws.cell(1, 4).alignment = Alignment(horizontal='center')
+        ws.cell(1, 4).fill = fillers[2]
+        ws.merge_cells(start_row=1, start_column=4, end_row=1, end_column=8)
+        wb.save(efile)
 
-    ws.cell(1, 4).value = 'TEST'
-    ws.cell(1, 4).alignment = Alignment(horizontal='center')
-    ws.cell(1, 4).fill = fillers[2]
-    ws.merge_cells(start_row=1, start_column=4, end_row=1, end_column=8)
-    wb.save(efile)
+    def test_rearrange(self):
+        file = "C:\\User\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Heureka results.xlsx"
+        rearrange_raw_heureka_results(file, ['FHF23-999 Avg Stand-Pine BAU', 'FHF23-999 Avg Stand-Pine PRES'])
 
+    def test_write_csv_file(self):
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        write_csv_file(os.path.join(dir_path, 'test.csv'),
+                       heureka_standdata_keys,
+                       heureka_standdata_desc,
+                       test=8, DGV=46, SiteIndexSpecies='G')
+        write_csv_file(os.path.join(dir_path, 'test.csv'),
+                       heureka_standdata_keys,
+                       heureka_standdata_desc,
+                       append=True, SiteIndexSpecies='T')
+        write_csv_file(os.path.join(dir_path, 'test2.csv'),
+                       heureka_standdata_keys,
+                       heureka_standdata_desc)
 
-def test_rearrange():
-    file = "C:\\User\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Heureka results.xlsx"
-    rearrange_raw_heureka_results(file, ['FHF23-999 Avg Stand-Pine BAU', 'FHF23-999 Avg Stand-Pine PRES'])
+    def test_export_fossagrim_stand(self):
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        # read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Bestandsutvalg.xlsx"
+        read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-005 Kvistaul\\FHF23-005 Bestandsutvalg.xlsx"
+        write_to_file = os.path.join(dir_path, 'standdata.csv')
 
+        export_fossagrim_stand_to_heureka(read_from_file, write_to_file,
+                                          stand_id_key='Fossagrim ID',
+                                          average_over={
+                                              'Spruce': ['FHF23-005-2', 'FHF23-005-13'],
+                                              'Pine': ['FHF23-005-26', 'FHF23-005-27']
+                                          }
+                                          )
+        # export_fossagrim_stand_to_heureka(read_from_file, write_to_file, average_over={'Spruce': [67, 70]},
+        #                                   this_stand_only=67)
 
-def test_write_csv_file():
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    write_csv_file(os.path.join(dir_path, 'test.csv'),
-                   heureka_standdata_keys,
-                   heureka_standdata_desc,
-                   test=8, DGV=46, SiteIndexSpecies='G')
-    write_csv_file(os.path.join(dir_path, 'test.csv'),
-                   heureka_standdata_keys,
-                   heureka_standdata_desc,
-                   append=True, SiteIndexSpecies='T')
-    write_csv_file(os.path.join(dir_path, 'test2.csv'),
-                   heureka_standdata_keys,
-                   heureka_standdata_desc)
+    def test_export_fossagrim_treatment(self):
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        # read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Bestandsutvalg.xlsx"
+        read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-005 Kvistaul\\FHF23-005 Bestandsutvalg.xlsx"
+        write_to_file = os.path.join(dir_path, 'treatment.csv')
 
+        export_fossagrim_treatment(read_from_file, write_to_file,
+                                   stand_id_key='Fossagrim ID',
+                                   average_over={
+                                       'Spruce': ['FHF23-005-2', 'FHF23-005-13'],
+                                       'Pine': ['FHF23-005-26', 'FHF23-005-27']
+                                   }
+                                   )
+        # export_fossagrim_treatment(read_from_file, write_to_file, average_over={'Spruce': [67, 70]},
+        #                            this_stand_only=67)
 
-def test_export_fossagrim_stand():
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    # read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Bestandsutvalg.xlsx"
-    read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-005 Kvistaul\\FHF23-005 Bestandsutvalg.xlsx"
-    write_to_file = os.path.join(dir_path, 'standdata.csv')
+    def test_get_kwargs_from_stand(self):
+        kwargs, combine_fractions = get_kwargs_from_stand(
+            # "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Bestandsutvalg.xlsx",
+            "C:\\Users\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0014 Arne Tag\\Bestandsoversikt 16052024.xlsx",
+            "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx",
+            "FHF24-0014"
+        )
+        for _key in kwargs:
+            print(_key, ':', kwargs[_key])
+        print('-x-')
+        print(combine_fractions)
+        if None in combine_fractions:
+            print('None is found')
 
-    export_fossagrim_stand_to_heureka(read_from_file, write_to_file,
-                                      stand_id_key='Fossagrim ID',
-                                      average_over={
-                                          'Spruce': ['FHF23-005-2', 'FHF23-005-13'],
-                                          'Pine': ['FHF23-005-26', 'FHF23-005-27']
-                                      }
-                                      )
-    # export_fossagrim_stand_to_heureka(read_from_file, write_to_file, average_over={'Spruce': [67, 70]},
-    #                                   this_stand_only=67)
+        # f = 'C:\\tmp\\test.xlsx'
+        # wb = openpyxl.load_workbook(f)
+        # ws = wb['Sheet1']
+        # for i, _key in enumerate(kwargs):
+        #     ws['A{}'.format(i+1)] = _key
+        #     ws['B{}'.format(i+1)] = kwargs[_key]
+        # wb.save(f)
 
+    def test_get_carbon_effect(self):
+        # result_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0016 Margrete Folsland\\FHF24-0016 Heureka results.xlsx"
+        # project_tag = "FHF24-0016"
+        # wood_species = "Pine"
+        result_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0047 Åmli\\FHF24-0047 v01 Heureka results.xlsx"
+        project_tag = "FHF24-0047 v01 Pine"
+        save_plot_to = result_file.replace("xlsx", "png")
+        print(save_plot_to)
+        # avg = get_carbon_effect(result_file, project_tag, wood_species=wood_species, save_plot_to=save_plot_to)
+        avg = get_carbon_effect(result_file, project_tag, save_plot_to=save_plot_to)
+        print(avg)
+        plt.show()
 
-def test_export_fossagrim_treatment():
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    # read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-003 Kloppmyra\\FHF23-003 Bestandsutvalg.xlsx"
-    read_from_file = "C:\\Users\\marten\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-005 Kvistaul\\FHF23-005 Bestandsutvalg.xlsx"
-    write_to_file = os.path.join(dir_path, 'treatment.csv')
+    def test_combine_raw_herureka_results(self):
+        file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Heureka results.xlsx"
+        sheet_name = 'FHF23-999 Pine BAU'
 
-    export_fossagrim_treatment(read_from_file, write_to_file,
-                               stand_id_key='Fossagrim ID',
-                               average_over={
-                                   'Spruce': ['FHF23-005-2', 'FHF23-005-13'],
-                                   'Pine': ['FHF23-005-26', 'FHF23-005-27']
-                               }
-                               )
-    # export_fossagrim_treatment(read_from_file, write_to_file, average_over={'Spruce': [67, 70]},
-    #                            this_stand_only=67)
+        def func(x, y):
+            return x - y
 
+        variables = {'x': 'Total Carbon Stock (dead wood, soil, trees, stumps and roots)',
+                     'y': 'Soil Carbon Stock'}
 
-def test_get_kwargs_from_stand():
-    kwargs, combine_fractions = get_kwargs_from_stand(
-        # "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Bestandsutvalg.xlsx",
-        "C:\\Users\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0014 Arne Tag\\Bestandsoversikt 16052024.xlsx",
-        "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx",
-        "FHF24-0014"
-    )
-    for _key in kwargs:
-        print(_key, ':', kwargs[_key])
-    print('-x-')
-    print(combine_fractions)
-    if None in combine_fractions:
-        print('None is found')
+        result = combine_raw_heureka_results(file, sheet_name, func, variables)
+        print(result)
 
-    # f = 'C:\\tmp\\test.xlsx'
-    # wb = openpyxl.load_workbook(f)
-    # ws = wb['Sheet1']
-    # for i, _key in enumerate(kwargs):
-    #     ws['A{}'.format(i+1)] = _key
-    #     ws['B{}'.format(i+1)] = kwargs[_key]
-    # wb.save(f)
+    def test_get_nature_carbon(self):
+        file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0047 Åmli\\FHF24-0047 v01 Heureka results.xlsx"
+        stand_id = 'FHF24-0047 v01 Spruce'
+        print(get_nature_and_climate_effect(file, stand_id, average_years=30, verbose=True))
 
-
-def test_get_carbon_effect():
-    # result_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0016 Margrete Folsland\\FHF24-0016 Heureka results.xlsx"
-    # project_tag = "FHF24-0016"
-    # wood_species = "Pine"
-    result_file ="C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0047 Åmli\\FHF24-0047 v01 Heureka results.xlsx"
-    project_tag = "FHF24-0047 v01 Pine"
-    save_plot_to = result_file.replace("xlsx", "png")
-    print(save_plot_to)
-    # avg = get_carbon_effect(result_file, project_tag, wood_species=wood_species, save_plot_to=save_plot_to)
-    avg = get_carbon_effect(result_file, project_tag, save_plot_to=save_plot_to)
-    print(avg)
-    plt.show()
-
-
-
-if __name__ == '__main__':
-    # test_rearrange()
-    # test_export_fossagrim_stand()
-    # test_export_fossagrim_treatment()
-    # test_write_excel_with_equations()
-    # test_modify_monetization_file()
-    # test_read_raw_heureka_results()
-    # test_get_kwargs_from_stand()
-    test_get_carbon_effect()
-    # test_read_fossagrim_treatment()
-    # collect_all_stand_data()
+    def test_collect_all_stand(self):
+        collect_all_stand_data(out_file="C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\TEST COLLECT STAND DATA.csv",
+                               dry_run=False)
