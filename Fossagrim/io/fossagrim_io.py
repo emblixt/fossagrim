@@ -80,6 +80,11 @@ def read_excel(filename, header, sheet_name):
     except PermissionError as err_msg:
         print(err_msg)
         return None
+
+    # Clean keys from trailing spaces or returns
+    old_keys = list(table.keys())
+    table = table.rename(columns={_key: _key.strip() for _key in old_keys})
+
     return table
 
 
@@ -412,7 +417,7 @@ def load_heureka_results(filename, header, sheet_name=None, year_key=None, data_
     return np.array(output_years), np.array(output_data)
 
 
-def arrange_export_of_one_stand(row_index, table):
+def arrange_export_of_one_stand(row_index, table, extra_keywords_list=None):
     """
     Utility function that collects, translates, and converts, the Fossagrim data into a format
     that can be used by heureka
@@ -423,6 +428,9 @@ def arrange_export_of_one_stand(row_index, table):
         pandas DataFrame
         Table with data as read in 'export_fossagrim_stand_to_heureka'
         Each row contains one stand
+    :param extra_keywords_list:
+        list
+        List of non-default keywords from heureka_standdata_keys that we want to add
     :return:
         dict
         Dictionary of keyword: value pairs that can be used by 'write_csv_file'
@@ -430,8 +438,11 @@ def arrange_export_of_one_stand(row_index, table):
     key_translation = translate_keys_from_fossagrim_to_heureka()
     keyword_arguments = {}
 
+    if extra_keywords_list is None:
+        extra_keywords_list = []
+
     # loop over all mandatory keywords that heureka needs as input
-    for key in heureka_mandatory_standdata_keys:
+    for key in heureka_mandatory_standdata_keys + extra_keywords_list:
         keyword_arguments[key] = ''  # Give every mandatory key a default empty value at first
         if key in list(key_translation.keys()):
             # Use the translated keyword to extract data from the Fossagrim table. NO CONVERSION YET!
@@ -648,7 +659,8 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
         if verbose:
             print('Attempting to write {} to {}'.format(stand_id, write_to_file))
         # get the data from the fossagrim table arranged for writing in heureka format
-        keyword_arguments = arrange_export_of_one_stand(i, table)
+        extra_keywords_list = ['PlantDensity', 'UserDefinedVariable2_RotationPeriod', 'UserDefinedVariable3_ThinningYear']
+        keyword_arguments = arrange_export_of_one_stand(i, table, extra_keywords_list)
         write_csv_file(
             write_to_file,
             heureka_standdata_keys,
@@ -1554,6 +1566,20 @@ def collect_all_stand_data_OLD(
 
 
 class TestCases(unittest.TestCase):
+    def test_arrange_export(self):
+        stand_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0047 Åmli\\FHF24-0047 Forvaltningsplan_v02.xlsx"
+        stand_id_key = 'Fossagrim ID'
+        sheet_name='data'
+        header = 7
+        table = read_excel(stand_file, header, sheet_name)
+        # print(list(table.keys()))
+        keyword_args = (
+            arrange_export_of_one_stand(1,
+                                        table,
+                                        ['PlantDensity', 'UserDefinedVariable2_RotationPeriod',
+                                         'UserDefinedVariable3_ThinningYear']))
+        print(keyword_args)
+
     def test_read_fossagrim_treatment(self):
         file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0014 Arne Tag\\FHF24-0014 Averaged treatment.csv"
         print(read_fossagrim_treatment(file, 'FHF24-0014', 'Spruce'))
@@ -1681,9 +1707,10 @@ class TestCases(unittest.TestCase):
     def test_get_kwargs_from_stand(self):
         kwargs, combine_fractions = get_kwargs_from_stand(
             # "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\FHF23-999 Bestandsutvalg.xlsx",
-            "C:\\Users\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0014 Arne Tag\\Bestandsoversikt 16052024.xlsx",
+            # "C:\\Users\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0014 Arne Tag\\Bestandsoversikt 16052024.xlsx",
+            "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0047 Åmli\\FHF24-0047 Forvaltningsplan_v02.xlsx",
             "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx",
-            "FHF24-0014"
+            "FHF24-0047 v02"
         )
         for _key in kwargs:
             print(_key, ':', kwargs[_key])

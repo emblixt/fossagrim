@@ -175,7 +175,8 @@ heureka_standdata_keys = heureka_mandatory_standdata_keys + [
     'UserDefinedVariable1_TaxType',
     'UserDefinedVariable2_RotationPeriod',
     'UserDefinedVariable3_ThinningYear',
-    'UserDefinedVariable4_PlantDensity',
+    # 'UserDefinedVariable4_PlantDensity',
+    'PlantDensity',
     'UserDefinedVariable5_ClimateEffect',
     'UserDefinedVariable6_DeadWoodEffect',
     'UserDefinedVariable7_RecreationEffect',
@@ -325,6 +326,10 @@ def translate_keys_from_fossagrim_to_heureka():
             translation['SIS'] = key
         if key == 'Plantetetthet':
             translation['PlantDensity'] = key
+        if key == 'Rotasjonsperiode':
+            translation['UserDefinedVariable2_RotationPeriod'] = key
+        if key == 'Tynnings år':
+            translation['UserDefinedVariable3_ThinningYear'] = key
     return translation
 
 
