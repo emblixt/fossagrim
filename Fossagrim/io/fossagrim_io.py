@@ -550,9 +550,6 @@ def average_over_stands(average_over, table, stand_id_key, average_name, verbose
                     print(' Sum over: {}: {}'.format(key, this_data))
                 this_row_of_data.append(this_data)
             elif key.strip() in keys_to_average_over:
-                print('XXX:', key, total_area)
-                print(' XX -', np.sum(table['Prod.areal'][average_ind]))
-                print(' XX -', np.sum(table[key][average_ind]))
                 this_data = np.sum(table['Prod.areal'][average_ind] * table[key][average_ind]) / total_area
                 if verbose:
                     print(' Average over:{}: {}'.format(key, this_data))
