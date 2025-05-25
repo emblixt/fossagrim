@@ -6,17 +6,17 @@ import argparse
 import sys
 
 
-def project_settings(_project_name, _project_folder, _stand_file, _result_file):
+def project_settings(_project_name, _project_folder, _stand_file):
     """
-    Reads the project settings Excel file, and extracts information from it to be used in the Heureka simulation
-    and sets up files necessary for storing results and monetization calculations for the given project
+    Creates the necessary input files and results file to make it easy to interact with Heureka using our
+    internal "Forvaltningsplan" file set up.
 
     Keys expected in project settings files:
-    "Project name", "Project folder", "Status", "Stand id key", "Stands file", "Results file",
+    "Project name", "Project folder", "Status", "Stand id key", "Stands file"
 
     :param _project_name:
         str
-        Name that identifies the current project, e.g. "FHF23-007 Gudmund Aaker"
+        Name that identifies the current project, e.g. "FHF23-007 v01"
 
     :param _project_folder:
         str
@@ -24,13 +24,16 @@ def project_settings(_project_name, _project_folder, _stand_file, _result_file):
 
     :param _stand_file:
         str
-        Full path file name of the "Forvaltningsplan" file
+        Full path file name of the "Forvaltningsplan" file (aka "Bestandsutvalg")
 
-    :param _result_file:
-        str
-        Full path file name of the empty Heureka results file that we shall save the
-        Heureka results in
     :return:
+        None
+        Creates two files:
+            "<_project_name> Averaged stand data.csv"  which is the input file to Heureka
+            "<_project_name> Heureka results.xlsx"  which is an empty xlsx file (with specific sheet names) that we
+            will use to store results from Heureka in later
+
+
     """
     import os
     import numpy as np
@@ -43,11 +46,10 @@ def project_settings(_project_name, _project_folder, _stand_file, _result_file):
 
     methods = ['BAU', 'PRES']  # "Business as usual" and "Preservation"
 
-    _qc_folder = os.path.join(_project_folder, 'QC_plots')
     _stand_id_key = 'Fossagrim ID'
-    # _monetization_file = os.path.join(_project_folder, p_tabl['Monetization file'][i])  # not calculated in Python
     _csv_stand_file = os.path.join(_project_folder, '{} Averaged stand data.csv'.format(_project_name))
-    _csv_treatment_file = os.path.join(_project_folder, '{} Averaged treatment.csv'.format(_project_name))
+    # Full path file name of the empty Heureka results file that we shall save the Heureka results in
+    _result_file = os.path.join(_project_folder, '{} Heureka results.xlsx'.format(_project_name))
 
     _average_over, _active_prod_areas, _active_prod_areas_fract = fio.get_active_forests_from_stand(
         _stand_file, stand_id_key=_stand_id_key, sheet_name='data')
@@ -55,6 +57,7 @@ def project_settings(_project_name, _project_folder, _stand_file, _result_file):
     # Excel can only handle sheet names that are shorter than 31 characters, and the longest string
     # we add is "Spruce PRES", which is 11 characters long.
     if len(_project_name) >= 20:
+        print('WARNING! Project name: {} is too long and has to be shortened to fit in Excel')
         tmp_project_name = _project_name[:10]
     else:
         tmp_project_name = _project_name
@@ -86,28 +89,12 @@ def project_settings(_project_name, _project_folder, _stand_file, _result_file):
         _combine_sheets['{} Combined Stands {} {}'.format(_project_name, '-and-'.join(forest_types), method)] = \
             _this_list
 
-    # Create empty QC folder if it doesn't exist from before
-    if not os.path.exists(_qc_folder):
-        os.makedirs(_qc_folder)
-
     # Create empty results file
-    create_results_file = True
-    # create_results_file = False
-    # if os.path.isfile(_result_file):
-    #     print("WARNING result file {} already exists.".format(
-    #         os.path.split(_result_file)[-1]))
-    #     _ans = input("Do you want to overwrite? Y/[N]:")
-    #     if _ans.upper() == 'Y':
-    #         create_results_file = True
-    # else:
-    #     create_results_file = True
-
-    if create_results_file:
-        writer = pd.ExcelWriter(_result_file, engine='xlsxwriter')
-        wb = writer.book
-        for _sheet in _result_sheets:
-            _ = wb.add_worksheet(_sheet)
-        writer.close()
+    writer = pd.ExcelWriter(_result_file, engine='xlsxwriter')
+    wb = writer.book
+    for _sheet in _result_sheets:
+        _ = wb.add_worksheet(_sheet)
+    writer.close()
 
     table = fio.read_excel(_stand_file, 7, 'data')
 
@@ -127,22 +114,25 @@ def project_settings(_project_name, _project_folder, _stand_file, _result_file):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    """
+    :param project_name:
+    str
+    Name that identifies the current project, e.g. "FHF23-007 v01"
+
+    :param project_folder:
+    str
+    Full path name to the folder where the inputs and outputs should be stored
+
+    :param stand_file:
+    str
+    Full path file name of the "Forvaltningsplan" file (aka "Bestandsutvalg")
+    """
     parser.add_argument("project_name")
     parser.add_argument("project_folder")
     parser.add_argument("stand_file")
-    parser.add_argument("result_file")
     args = parser.parse_args()
 
     project_folder, stand_file, average_over, stand_id_key, result_file, result_sheets, combine_sheets, \
         csv_stand_file = \
-        project_settings(args.project_name, args.project_folder, args.stand_file, args.result_file)
-
-    print(project_folder)
-    print(stand_file)
-    print(average_over)
-    print(stand_id_key)
-    print(result_file)
-    print(result_sheets)
-    print(combine_sheets)
-    print(csv_stand_file)
+        project_settings(args.project_name, args.project_folder, args.stand_file)
 
