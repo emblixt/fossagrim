@@ -53,6 +53,16 @@ def my_str(x):
         return str(x)
 
 
+def my_str_to_float(x):
+    try:
+        a = float(x)
+        if a.is_integer():
+            a = int(a)
+    except ValueError:
+        a = x
+    return a
+
+
 def get_row_index(table, key, item):
     """
     Returns the row index of the item
@@ -142,6 +152,30 @@ def write_csv_file(write_to_file, default_keys, default_desc, append=False, **kw
             f.write(';'.join(data) + '\n')
 
 
+def read_csv_file(read_from_file):
+    """
+    Reads a typical StandData.csv file that is used as input to Heureka
+    :param read_from_file:
+    :return:
+    dictionary with each column header as keys, and the data for each stand as a list of values for
+    that specific column, and also the list of descriptors, which makes it easy to use the output to
+    write a new/append to csv file
+    """
+
+    with open(read_from_file, 'r') as _in:
+        for i, line in enumerate(_in.readlines()):
+            split_line = line.split(';')
+            if i == 0:
+                descriptors = split_line
+            elif i == 1:
+                out = {_key: [] for _key in split_line}
+            else:
+                for j, val in enumerate(split_line):
+                    out[list(out.keys())[j]].append(my_str_to_float(val))
+
+    return out, descriptors
+
+
 def read_raw_heureka_results(filename, sheet_name, read_only_these_variables=None, verbose=False):
     """
     Read heureka results as exported from Heureka (by simply copying a simulation result and pasting it
@@ -196,6 +230,7 @@ def read_raw_heureka_results(filename, sheet_name, read_only_these_variables=Non
         # ax.legend()
         # fig.savefig(os.path.join(qc_plot_dir, 'raw_heureka_{}.png'.format(sheet_name)))
 
+    print('XXX', data_dict)
     result = pd.DataFrame(data=data_dict)
     result.attrs = unit_dict
     return result
@@ -376,6 +411,42 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
     return write_monetization_file
 
 
+def read_rearranged_heureka_results(filename, sheet_name=None):
+    """
+    Reads the re-arranged data in a Heureka result xlsx file and returns
+    a dictionary which has each model name (e.g. 'FHF24-0047 v02 Spruce BAU') as key and
+    the associated data as value. The data is a Pandas DataFrame which has the same
+    structure as the output from read_raw_heureka results
+    :param filename:
+    :param sheet_name:
+    :return:
+    """
+    if sheet_name is None:
+        sheet_name = 'Rearranged results'
+
+    # First read the file to determine how many stands there are, and the number of parameters in each
+    table = read_excel(filename, 0, sheet_name)
+    models = {}
+    for _i, _x in enumerate(list(table.keys())):
+        if 'Unnamed' in _x:
+            continue
+        models[_x] = _i
+    n_params = models[list(models.keys())[1]] - models[list(models.keys())[0]] - 1
+    # print(models, n_params)
+
+    result = {}
+    for _i, model in enumerate(list(models.keys())):  # iterate over all models
+        _tmp = {}
+        start_c = _i * (n_params + 1)
+        end_c = start_c + n_params
+        # Within each model, iterate over all parameters
+        for _c in range(start_c + 1, end_c):  # + 1 because we skip the column with Periods
+            param = table.iloc[1, _c]
+            _tmp[param] = table.iloc[2:, _c]
+        result[model] = pd.DataFrame(data=_tmp)
+    return result
+
+
 def load_heureka_results(filename, header, sheet_name=None, year_key=None, data_key=None):
     """
     Loads a typical output from Heureka where a time serie is given as a row.
@@ -545,12 +616,21 @@ def average_over_stands(average_over, table, stand_id_key, average_name, verbose
                     print(' {}: {}'.format(key, this_data))
                 this_row_of_data.append(this_data)
             elif key.strip() in keys_to_sum_over:
-                this_data = np.sum(table[key][average_ind])
+                this_column = [my_float(_x) for _x in table[key][average_ind]]  # Try to avoid strings with ',' instead of '.' in floats
+                this_data = np.sum(this_column)
+                # this_data = np.sum(table[key][average_ind])
                 if verbose:
                     print(' Sum over: {}: {}'.format(key, this_data))
                 this_row_of_data.append(this_data)
             elif key.strip() in keys_to_average_over:
-                this_data = np.sum(table['Prod.areal'][average_ind] * table[key][average_ind]) / total_area
+                this_column = [my_float(_x) for _x in table[key][average_ind]]
+                this_area_column = [my_float(_x) for _x in table['Prod.areal'][average_ind]]
+                if verbose:
+                    print('Average over:', key)
+                    print(' Data: ', this_column)
+                    print(' Sum:', np.sum(this_column))
+                this_data = np.sum(np.array(this_area_column) * np.array(this_column)) / total_area
+                # this_data = np.sum(table['Prod.areal'][average_ind] * table[key][average_ind]) / total_area
                 if verbose:
                     print(' Average over:{}: {}'.format(key, this_data))
                 this_row_of_data.append(this_data)
@@ -1587,7 +1667,7 @@ class TestCases(unittest.TestCase):
         sheet_name = 'FHF23-999 Pine BAU'
         result = read_raw_heureka_results(file, sheet_name, variables_used_in_monetization, False)
         print(result.keys())
-        print(result)
+        # print(result)
 
     def test_modify_monetization_file(self):
         mf = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF23-999 Testing only\\Test Monetization.xlsx"
@@ -1758,3 +1838,15 @@ class TestCases(unittest.TestCase):
     def test_collect_all_stand(self):
         collect_all_stand_data(out_file="C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\TEST COLLECT STAND DATA.csv",
                                dry_run=False)
+
+    def test_read_rearranged_results(self):
+        filename = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0047 Åmli\\FHF24-0047 v02 Heureka results.xlsx"
+        result = read_rearranged_heureka_results(filename)
+        fpp.plot_raw_data(result['FHF24-0047 v02 Spruce BAU'], 'XXX', 'test',
+                          "C:\\Users\\marte\\Downloads")
+
+    def test_read_csv_file(self):
+        filename = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0047 Åmli\\FHF24-0047 v02 Averaged stand data.csv"
+        data, d = read_csv_file(filename)
+        print(data)
+        print(d)
