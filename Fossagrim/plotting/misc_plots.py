@@ -540,7 +540,7 @@ def plot_collected_stand_data(csv_file):
     console.log('dropdown: ' + cb_obj.value, x_param);
     data.change.emit()
     """
-    args_dict  = dict(x_drop=x_drop,
+    args_dict = dict(x_drop=x_drop,
                       y_drop=y_drop,
                       s_drop=s_drop,
                       data=data_source,
