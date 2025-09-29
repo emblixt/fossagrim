@@ -47,6 +47,40 @@ import argparse
 import sys
 
 
+def check_hovedtallsrapport(_fplan: str, _hrapp: str) -> str:
+    """
+
+    :param _fplan:
+       full pathname of excel file that contains the 'forvaltningsplan'
+    :param _hrapp:
+       full pathname of pdf file that contains the 'hovedtallsrapport'
+    :return: str
+    """
+    import pypdf
+    sys.path.append('..')
+
+    from Fossagrim.io.fossagrim_io import read_excel
+
+    fplan_table = read_excel(_fplan, 6, 'Forvaltning')
+    fplan_prod_areal = fplan_table['Prod.areal'][0]
+    fplan_total_volume = fplan_table['Total'][0]
+    print(fplan_prod_areal, fplan_total_volume)
+
+    _str = ''
+    with open(_hrapp, 'rb') as file:
+        reader = pypdf.PdfReader(file)
+        for i in range(reader.get_num_pages()):
+            page = reader.get_page(i)
+            _str += page.extract_text()
+
+    str_list = _str.split('\n')
+    _i = str_list.index('Total kubikkmasse')
+    print(str_list[_i], str_list[_i+1])
+    hrapp_total_volume = float(str_list[_i+1].strip().replace(' ', ''))
+
+    return _str
+
+
 def pdf_consistency(_fplan: str, _hrapp: str, _srapp: str, _log_file: str):
     """
 
@@ -68,11 +102,14 @@ def pdf_consistency(_fplan: str, _hrapp: str, _srapp: str, _log_file: str):
     """
     from datetime import datetime
     import os
-    with open(_log_file, 'w') as log_file:
+
+    with open(_log_file, 'w',  encoding="utf-8") as log_file:
         log_file.write('QC done {}\n'.format(str(datetime.now())))
         log_file.write(' Using Forvaltningsplan: {}\n'.format(os.path.basename(_fplan)))
         log_file.write(' and Hovedtallsrapport: {}\n'.format(os.path.basename(_hrapp)))
         log_file.write(' and Sumtallsrapport: {}\n'.format(os.path.basename(_srapp)))
+
+        log_file.write(check_hovedtallsrapport(_fplan, _hrapp))
 
 
 if __name__ == '__main__':
