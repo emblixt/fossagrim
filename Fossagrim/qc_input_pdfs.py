@@ -125,25 +125,25 @@ def check_forvaltningsplan(_fplan: str, log_text: str,  warn_text: str) -> tuple
     fplan_table = read_excel(_fplan, 6, 'Forvaltning')
     _warn_text = ''
 
-    # 3. No harvest in MIS nr_miljo_fig = 0
+    # 3. No harvest (or more correctly - no area with MIS included) in MIS
     nr_miljo_fig = 0
     for _i, _ans in enumerate(fplan_table['Miljøfig']):
-        if _ans == 'Ja':
+        if not isinstance(_ans, str):
+            continue
+        if float(fplan_table['Proj areal'][_i]) > 0.0 and _ans.strip() == 'Ja':
             nr_miljo_fig += 1
-            if float(fplan_table['Proj vol'][_i]) > 0.0:
-                _warn_text += 'WARNING: Bestand {} has a mismatch between "misfig" ({}) and cutting ({})'.format(
-                    fplan_table['GBTBestand'][_i], _ans, fplan_table['Total hogst%'][_i])
+            _warn_text += 'WARNING: Bestand {} has a mismatch between "misfig" ({}) and inclusion in project areal ({})\n'.format(
+                fplan_table['GBTBestand'][_i], _ans, fplan_table['Proj areal'][_i])
 
     log_text += '  -Project contain {} number of mis figs\n'.format(nr_miljo_fig)
 
     # 4. No harvest in hogstklasse < IV
     nr_hogstklasse_below = 0
     for _i, _ans in enumerate(fplan_table['H.kl']):
-        if 4.0 > float(_ans) > 0:
+        if 4.0 > float(_ans) > 0 and float(fplan_table['Proj vol'][_i]) > 0.0:
             nr_hogstklasse_below += 1
-            if float(fplan_table['Proj vol'][_i]) > 0.0:
-                _warn_text += ('WARNING: Bestand {} is cutting in hogstklasse < 4 ({})\n').format(
-                    fplan_table['GBTBestand'][_i], _ans)
+            _warn_text += ('WARNING: Bestand {} is cutting in hogstklasse < 4 ({})\n').format(
+                fplan_table['GBTBestand'][_i], _ans)
 
     log_text += '  -Project contain {} stand in hogstklass < 4\n'.format(nr_hogstklasse_below)
 
@@ -151,9 +151,8 @@ def check_forvaltningsplan(_fplan: str, log_text: str,  warn_text: str) -> tuple
     nr_hogstklasse_4 = 0
     for _i, _ans in enumerate(fplan_table['H.kl']):
         if float(_ans) == 4.0:
-            nr_hogstklasse_4 += 1
-
-            if float(fplan_table['Active'][_i]) != 0.0 and not isinstance(fplan_table['Begrunnelse'][_i], str):
+            if float(fplan_table['Proj vol'][_i]) > 0.0 and not isinstance(fplan_table['Begrunnelse'][_i], str):
+                nr_hogstklasse_4 += 1
                 _warn_text += ('Bestand {} is cutting in hogstklasse 4 ({}) without "Begrunnelse"\n').format(
                     fplan_table['GBTBestand'][_i], _ans)
 
@@ -217,16 +216,21 @@ def check_sumtallsrapport(_fplan: str, _srapp: str, log_text: str, warn_text: st
     fplan_total_volume = 0.
     fplan_nr_stands = 0
     fplan_selected_stands = ''
-    for _i, _proj_vol in enumerate(fplan_table['Proj vol']):
+    for _i, _proj_area in enumerate(fplan_table['Proj areal']):
         if _i == 0:
             continue
-        if float(_proj_vol) > 0:
+        if float(_proj_area) > 0:
             # print(_i, _proj_vol, fplan_table['Prod.areal'][_i], fplan_table['Total'][_i])
-            fplan_nr_stands += 1
             fplan_selected_stands += ', {}'.format(int(fplan_table['Bestand'][_i]))
             fplan_prod_areal += float(fplan_table['Prod.areal'][_i])
             fplan_total_volume += float(fplan_table['Total'][_i])
     fplan_selected_stands = fplan_selected_stands[2:]
+
+    for _i, _proj_area in enumerate(fplan_table['Prod.areal']):
+        if _i == 0:
+            continue
+        if float(_proj_area) > 0:
+            fplan_nr_stands += 1
 
     _str = ''
     with open(_srapp, 'rb') as file:
@@ -266,15 +270,16 @@ def check_sumtallsrapport(_fplan: str, _srapp: str, log_text: str, warn_text: st
         _warn_text += 'WARNING: The selected stands in Forvaltningsplan\n {}\nare not equal to the selected stands in Sumtallsrapport\n {}\n'.format(fplan_selected_stands, srapp_selected_stands)
 
     # 6. Project productive area matches sumtallsrapport
-    if np.floor(float(fplan_prod_areal)) != np.floor(float(srapp_prod_areal)):
+    if np.round(float(fplan_prod_areal)) != np.round(float(srapp_prod_areal)):
         _warn_text += 'WARNING: Productive areal from Forvaltningsplan ({}) does not match that from Sumtallsrapport ({})\n'.format(float(fplan_prod_areal), float(srapp_prod_areal))
 
-    # 7. Project stand numbers match sumtallsrapport
-    if fplan_nr_stands != srapp_nr_stands:
-        _warn_text += 'WARNING: Number of stands from Forvaltningsplan ({}) does not match that from Sumtallsrapport ({})\n'.format(float(fplan_nr_stands), float(srapp_nr_stands))
+    # We skip this test, because the Sumtallsrapport contain non-productive stands
+    # # 7. Project stand numbers match sumtallsrapport
+    # if fplan_nr_stands != srapp_nr_stands:
+    #     _warn_text += 'WARNING: Number of stands from Forvaltningsplan ({}) does not match that from Sumtallsrapport ({})\n'.format(float(fplan_nr_stands), float(srapp_nr_stands))
 
     # 8. Project total volume matches sumtallsrapport
-    if np.floor(float(fplan_total_volume)) != np.floor(float(srapp_total_volume)):
+    if np.round(float(fplan_total_volume)) != np.round(float(srapp_total_volume)):
         _warn_text += 'WARNING: Total volume from Forvaltningsplan ({}) does not match that from Sumtallsrapport ({})\n'.format(float(fplan_total_volume), float(srapp_total_volume))
 
     if len(_warn_text) > 0:
@@ -283,7 +288,7 @@ def check_sumtallsrapport(_fplan: str, _srapp: str, log_text: str, warn_text: st
     return log_text, warn_text
 
 
-def pdf_consistency(_fplan: str, _hrapp: str, _srapp: str, _log_file: str):
+def pdf_consistency(_fplan: str, _hrapp: str, _srapp: str, _project_name: str):
     """
 
     :param _fplan:
@@ -292,14 +297,16 @@ def pdf_consistency(_fplan: str, _hrapp: str, _srapp: str, _log_file: str):
        full pathname of pdf file that contains the 'hovedtallsrapport'
     :param _srapp:
        full pathname of pdf file that contains the 'sumtallsrapport'
-    :param _log_file:
-       full pathname of test file that contains the results of the qc
+    :param _project_name:
+       text string that identifies this particular project forest, e.g.
+           'FHF-0001-02 t06_v2'
 
     :return:
         None
         Creates one, potentially two, file(s):
             _log_file  which contains a listing of potential inconsistencies between
             the 'forvaltningsplan' and the two 'hovedtallsrapport' and 'sumtallsrapport'
+            It is stored in the same folder as the _fplan file
         AND OPTIONALLY
             a "warning" file in the same directory as _log_file, which flags potential inconsistencies
 
@@ -307,7 +314,10 @@ def pdf_consistency(_fplan: str, _hrapp: str, _srapp: str, _log_file: str):
     from datetime import datetime
     import os
 
-    warn_file = os.path.join(os.path.dirname(_log_file), 'WARNING.txt')
+    _log_file = os.path.join(os.path.dirname(_fplan), 'qc_log {}.txt'.format(_project_name))
+    if os.path.exists(_log_file):
+        os.remove(_log_file)
+    warn_file = os.path.join(os.path.dirname(_fplan), 'WARNING {}.txt'.format(_project_name))
     if os.path.exists(warn_file):
         os.remove(warn_file)
 
@@ -345,18 +355,18 @@ if __name__ == '__main__':
     :param sumtalls_rapport_file:
        full pathname of pdf file that contains the 'sumtallsrapport'
        
-    :param log_file:
-       full pathname of text file that contains the results of the quality control
+    :param project_name:
+        string that defines the project name
        
     Use it by calling:
-    > python qc_input_pdfs.py <forvaltningsplan_file.xlsx> <hovedtallsrapport_file.pdf <log_file.txt>> <sumtallsrapport_file.pdf> <log_file.txt>
+    > python qc_input_pdfs.py <forvaltningsplan_file.xlsx> <hovedtallsrapport_file.pdf <log_file.txt>> <sumtallsrapport_file.pdf> <project_name>
         
     """
     parser.add_argument("forvaltnings_plan_file")
     parser.add_argument("hovedtalls_rapport_file")
     parser.add_argument("sumtalls_rapport_file")
-    parser.add_argument("log_file")
+    parser.add_argument("project_name")
     args = parser.parse_args()
-    pdf_consistency(args.forvaltnings_plan_file, args.hovedtalls_rapport_file, args.sumtalls_rapport_file, args.log_file)
+    pdf_consistency(args.forvaltnings_plan_file, args.hovedtalls_rapport_file, args.sumtalls_rapport_file, args.project_name)
 
 

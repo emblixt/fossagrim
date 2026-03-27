@@ -6,7 +6,7 @@ import argparse
 import sys
 
 
-def project_settings(_project_name, _project_folder, _stand_file):
+def project_settings(_project_name, _project_folder, _stand_file, create_output=True):
     """
     Creates the necessary input files and results file to make it easy to interact with Heureka using our
     internal "Forvaltningsplan" file set up.
@@ -25,6 +25,10 @@ def project_settings(_project_name, _project_folder, _stand_file):
     :param _stand_file:
         str
         Full path file name of the "Forvaltningsplan" file (aka "Bestandsutvalg")
+
+    :param create_output:
+        Bool
+        When True the output files are created
 
     :return:
         None
@@ -89,24 +93,25 @@ def project_settings(_project_name, _project_folder, _stand_file):
         _combine_sheets['{} Combined Stands {} {}'.format(_project_name, '-and-'.join(forest_types), method)] = \
             _this_list
 
-    # Create empty results file
-    writer = pd.ExcelWriter(_result_file, engine='xlsxwriter')
-    wb = writer.book
-    for _sheet in _result_sheets:
-        _ = wb.add_worksheet(_sheet)
-    writer.close()
+    if create_output:
+        # Create empty results file
+        writer = pd.ExcelWriter(_result_file, engine='xlsxwriter')
+        wb = writer.book
+        for _sheet in _result_sheets:
+            _ = wb.add_worksheet(_sheet)
+        writer.close()
 
-    table = fio.read_excel(_stand_file, 7, 'data')
+        table = fio.read_excel(_stand_file, 7, 'data')
 
-    fio.export_fossagrim_stand_to_heureka(
-        _stand_file,
-        _csv_stand_file,
-        average_over=_average_over,
-        stand_id_key=_stand_id_key,
-        average_name='{} '.format(args.project_name),
-        sheet_name='data',
-        verbose=False
-    )
+        fio.export_fossagrim_stand_to_heureka(
+            _stand_file,
+            _csv_stand_file,
+            average_over=_average_over,
+            stand_id_key=_stand_id_key,
+            average_name='{} '.format(args.project_name),
+            sheet_name='data',
+            verbose=False
+        )
 
     return _project_folder, _stand_file, _average_over, _stand_id_key, _result_file, _result_sheets, _combine_sheets, \
         _csv_stand_file
@@ -134,5 +139,5 @@ if __name__ == '__main__':
 
     project_folder, stand_file, average_over, stand_id_key, result_file, result_sheets, combine_sheets, \
         csv_stand_file = \
-        project_settings(args.project_name, args.project_folder, args.stand_file)
+        project_settings(args.project_name, args.project_folder, args.stand_file, True)
 

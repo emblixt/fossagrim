@@ -10,7 +10,9 @@ methods = ['BAU', 'PRES']  # "Business as usual" and "Preservation"
 
 
 def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_over, _stand_id_key, _project_tag,
+                   _hrapp, _srapp,
                    _verbose=False, **_kwargs):
+    from Fossagrim.qc_input_pdfs import pdf_consistency
 
     # QC input table
     table = fio.read_excel(_stand_file, 7, 'data')
@@ -19,6 +21,11 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
         os.path.basename(_stand_file),
         os.path.join(os.path.dirname(_stand_file), 'QC_plots')
     )
+
+    # QC input
+    if _hrapp is not None and _srapp is not None:
+        print('WILL START THE TEST')
+        pdf_consistency(_stand_file, _hrapp, _srapp, _project_tag)
 
     fio.export_fossagrim_stand_to_heureka(
         _stand_file,
@@ -80,6 +87,8 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
 
     i = None
     tag_found = False
+    _hrapp = None
+    _srapp = None
     for i, p_name in enumerate(p_tabl['Project name']):
         if not isinstance(p_name, str):
             continue
@@ -87,6 +96,9 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
             continue
         if _project_name == p_name.strip():
             tag_found = True
+            if isinstance(p_tabl['Hovedtallsrapport'][i], str) and isinstance(p_tabl['Sumtallsrapport'][i], str):
+                _hrapp = p_tabl['Hovedtallsrapport'][i]
+                _srapp = p_tabl['Sumtallsrapport'][i]
             break
 
     if not tag_found:
@@ -105,6 +117,9 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
                 p_tabl['Stand id key'][i],
                 p_tabl['Stands file'][i],
                 p_tabl['Results file'][i]))
+            if _hrapp is not None:
+                print(" AND Hovedtallsrapport: '{}' and Sumtallsrapport: '{}' to QC the input".format(
+                    os.path.basename(_hrapp), os.path.basename(_srapp)))
 
     _project_folder = p_tabl['Project folder'][i]
     _qc_folder = os.path.join(_project_folder, 'QC_plots')
@@ -161,7 +176,7 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
 
     if not _fix_import:
         return (_project_folder, _stand_file, _average_over, _stand_id_key, _result_file, _result_sheets,
-                _combine_sheets, None, _csv_stand_file, _csv_treatment_file, {})
+                _combine_sheets, None, _csv_stand_file, _csv_treatment_file, _hrapp, _srapp,  {})
 
     # Create empty QC folder if it doesn't exist from before
     if not os.path.exists(_qc_folder):
@@ -186,25 +201,26 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
         writer.close()
 
     return _project_folder, _stand_file, _average_over, _stand_id_key, _result_file, _result_sheets, _combine_sheets, \
-        None, _csv_stand_file, _csv_treatment_file, {}
+        None, _csv_stand_file, _csv_treatment_file, _hrapp, _srapp, {}
 
 
 if __name__ == '__main__':
-    project_name = 'FHF23-0005 t06_v3HA'
+    project_name = 'FHF-0026 t06_v2'
     project_settings_file = 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\ProjectForestsSettings.xlsx'
 
     # Set to False after Heureka simulation results have been saved in result_file, and you want to
     # rearrange the results so that they are easier to include in climate benefit calculations
-    fix_import = False
+    fix_import = True
 
     verbose = True
 
     project_folder, stand_file, average_over, stand_id_key, result_file, result_sheets, combine_sheets, \
-        monetization_file, csv_stand_file, csv_treatment_file, kwargs = \
+        monetization_file, csv_stand_file, csv_treatment_file, hrapp, srapp, kwargs = \
         project_settings(project_name, project_settings_file, fix_import, verbose)
 
     if fix_import:
         arrange_import(stand_file, csv_stand_file, csv_treatment_file, average_over, stand_id_key, project_name,
+                       hrapp, srapp,
                        _verbose=verbose, **kwargs)
     elif not fix_import:
         arrange_results(result_file, result_sheets, combine_sheets, monetization_file, _verbose=verbose,  **kwargs)
