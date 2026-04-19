@@ -489,7 +489,7 @@ def load_heureka_results(filename, header, sheet_name=None, year_key=None, data_
     return np.array(output_years), np.array(output_data)
 
 
-def arrange_export_of_one_stand(row_index, table, extra_keywords_list=None):
+def arrange_export_of_one_stand(row_index, table, extra_keywords_list=None, unique_id=None):
     """
     Utility function that collects, translates, and converts, the Fossagrim data into a format
     that can be used by heureka
@@ -503,6 +503,12 @@ def arrange_export_of_one_stand(row_index, table, extra_keywords_list=None):
     :param extra_keywords_list:
         list
         List of non-default keywords from heureka_standdata_keys that we want to add
+    :param unique_id:
+        str
+        When not None, this string is passed on to the "<_project_name> Averaged stand data.csv" file and stored in
+        column "UserDefinedVariable8" (column DA when opened in Excel) for each averaged stand.
+        It is used as an identifier in the Woods platform to allow us to separate between different versions
+
     :return:
         dict
         Dictionary of keyword: value pairs that can be used by 'write_csv_file'
@@ -554,6 +560,8 @@ def arrange_export_of_one_stand(row_index, table, extra_keywords_list=None):
             keyword_arguments[key] = table['Lauv'][row_index] / table['Total'][row_index]
         if key == 'StandId':
             keyword_arguments[key] = table['Fossagrim ID'][row_index]
+        if key == 'UniqueID':
+            keyword_arguments[key] = unique_id
 
     return keyword_arguments
 
@@ -676,7 +684,7 @@ def average_over_stands(average_over, table, stand_id_key, average_name, verbose
 
 def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_only=None, average_over=None,
                                       stand_id_key=None,
-                                      header=None, sheet_name=None, average_name=None, verbose=False):
+                                      header=None, sheet_name=None, average_name=None, verbose=False, unique_id=None):
     """
     Load a 'typical' Fossagrim stand data file (Bestandsutvalg) and writes an output file which Heureka can use
     See https://www.heurekaslu.se/wiki/Import_of_stand_register for description of parameters used by Heureka
@@ -700,6 +708,12 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
         Key that is used to identify the stands used in 'average_over'
     :param header:
     :param sheet_name:
+    :param unique_id:
+        int
+        When not None, this string is passed on to the "<_project_name> Averaged stand data.csv" file and stored in
+        column "UserDefinedVariable8" (column DA when opened in Excel) for each averaged stand.
+        It is used as an identifier in the Woods platform to allow us to separate between different versions
+
     :return:
     """
     if stand_id_key is None:
@@ -737,8 +751,13 @@ def export_fossagrim_stand_to_heureka(read_from_file, write_to_file, this_stand_
         if verbose:
             print('Attempting to write {} to {}'.format(stand_id, write_to_file))
         # get the data from the fossagrim table arranged for writing in heureka format
-        extra_keywords_list = ['PlantDensity', 'UserDefinedVariable2_RotationPeriod', 'UserDefinedVariable3_ThinningYear']
-        keyword_arguments = arrange_export_of_one_stand(i, table, extra_keywords_list)
+        if unique_id is not None:
+            extra_keywords_list = ['PlantDensity', 'UserDefinedVariable2_RotationPeriod',
+                                   'UserDefinedVariable3_ThinningYear', 'UniqueID']
+        else:
+            extra_keywords_list = ['PlantDensity', 'UserDefinedVariable2_RotationPeriod',
+                                   'UserDefinedVariable3_ThinningYear']
+        keyword_arguments = arrange_export_of_one_stand(i, table, extra_keywords_list, unique_id=unique_id)
         write_csv_file(
             write_to_file,
             heureka_standdata_keys,

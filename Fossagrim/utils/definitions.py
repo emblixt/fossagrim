@@ -180,7 +180,7 @@ heureka_standdata_keys = heureka_mandatory_standdata_keys + [
     'UserDefinedVariable5_ClimateEffect',
     'UserDefinedVariable6_DeadWoodEffect',
     'UserDefinedVariable7_RecreationEffect',
-    'UserDefinedVariable8',
+    'UniqueID',
     'UserDefinedVariable9',
     'UserDefinedVariable10',
     'SetAsideType'
@@ -200,7 +200,7 @@ heureka_standdata_desc = [
     '','','','','','','','','','','','År','År','Planter/ha',
     '30 yrs sum of diff. in Total carbon (PRES-BAU), ignoring Soil. ton C/ha',
     '30 yrs sum of diff. in Deadwood >= 20cm (PRES-BAU), m3/h',
-    '30 yrs sum of diff. in Recreation Index After (PRES-BAU)','','','',''
+    '30 yrs sum of diff. in Recreation Index After (PRES-BAU)','Unique version string','','',''
 ]
 
 heureka_treatment_keys = [

@@ -6,7 +6,7 @@ import argparse
 import sys
 
 
-def project_settings(_project_name, _project_folder, _stand_file, create_output=True):
+def project_settings(_project_name, _project_folder, _stand_file, create_output=True, _unique_id=None):
     """
     Creates the necessary input files and results file to make it easy to interact with Heureka using our
     internal "Forvaltningsplan" file set up.
@@ -29,6 +29,12 @@ def project_settings(_project_name, _project_folder, _stand_file, create_output=
     :param create_output:
         Bool
         When True the output files are created
+
+    :param _unique_id:
+        int
+        When not None, this string is passed on to the "<_project_name> Averaged stand data.csv" file and stored in
+        column "UserDefinedVariable8" (column DA when opened in Excel) for each averaged stand.
+        It is used as an identifier in the Woods platform to allow us to separate between different versions
 
     :return:
         None
@@ -110,7 +116,8 @@ def project_settings(_project_name, _project_folder, _stand_file, create_output=
             stand_id_key=_stand_id_key,
             average_name='{} '.format(args.project_name),
             sheet_name='data',
-            verbose=False
+            verbose=False,
+            unique_id=_unique_id
         )
 
     return _project_folder, _stand_file, _average_over, _stand_id_key, _result_file, _result_sheets, _combine_sheets, \
@@ -131,13 +138,31 @@ if __name__ == '__main__':
     :param stand_file:
     str
     Full path file name of the "Forvaltningsplan" file (aka "Bestandsutvalg")
+    
+    :param unique_id:
+    int
+    Optional
+    When not None, this string is passed on to the "<project_name> Averaged stand data.csv" file and stored in
+    column "UserDefinedVariable8" (column DA when opened in Excel) for each averaged stand.
+    It is used as an identifier in the Woods platform to allow us to separate between different versions
+    
+    Use it by calling:
+    > python create_heureka_input_files.py <project_name> <project_folder> <stand_file> 
+    OR OPTIONALLY
+    > python create_heureka_input_files.py <project_name> <project_folder> <stand_file>  <unique_id>
+    
+    NOTE!
+    You must be located in the same folder as the rearrange_heureka_results.py script for the relative import to work
     """
     parser.add_argument("project_name")
     parser.add_argument("project_folder")
     parser.add_argument("stand_file")
+    parser.add_argument("unique_id", nargs='?')
+
     args = parser.parse_args()
 
     project_folder, stand_file, average_over, stand_id_key, result_file, result_sheets, combine_sheets, \
         csv_stand_file = \
-        project_settings(args.project_name, args.project_folder, args.stand_file, True)
+        project_settings(args.project_name, args.project_folder, args.stand_file, True,
+                         _unique_id=args.unique_id)
 
