@@ -203,7 +203,8 @@ def read_raw_heureka_results(filename, sheet_name, read_only_these_variables=Non
     except KeyError as error:
         print('Variable Year not in file! ', error)
         return None
-    five_years = [np.mod(this_year, 5) == 0 for this_year in table.iloc[year_row, 3:]]
+
+    five_years = [np.mod(float(this_year), 5) == 0 for this_year in table.iloc[year_row, 3:]]
     # print(table.iloc[year_row, 3:][five_years])
     data_dict = {}
     unit_dict = {}
@@ -231,7 +232,6 @@ def read_raw_heureka_results(filename, sheet_name, read_only_these_variables=Non
         # ax.legend()
         # fig.savefig(os.path.join(qc_plot_dir, 'raw_heureka_{}.png'.format(sheet_name)))
 
-    print('XXX', data_dict)
     result = pd.DataFrame(data=data_dict)
     result.attrs = unit_dict
     return result
@@ -378,7 +378,8 @@ def rearrange_raw_heureka_results(filename, sheet_names, combine_sheets, monetiz
                 this_column = np.zeros(len(tables[0][key]))
                 for k in range(len(tables)):
                     # Combine the tables using the fractions
-                    this_column = this_column + tables[k][key].values * fractions[k]
+                    this_column = this_column + np.array([float(_x) for _x in tables[k][key].values]) * fractions[k]
+                    # this_column = this_column + tables[k][key].values * fractions[k]
                 combined_dict[key] = this_column
             combined_table = pd.DataFrame(data=combined_dict)
 
