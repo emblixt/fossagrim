@@ -1,16 +1,12 @@
 """Tests of the sheet/file naming conventions and of the two command line scripts"""
 import os
-import subprocess
-import sys
 
 import openpyxl
 import pytest
 
 from Fossagrim.io.common import read_csv_file
 from Fossagrim.utils.project_setup import build_result_sheets, build_combine_sheets, sheet_name_prefix
-from Fossagrim.unit_tests.conftest import raw_heureka_rows, write_heureka_results
-
-PACKAGE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from Fossagrim.unit_tests.conftest import raw_heureka_rows, write_heureka_results, run_script
 
 
 def test_build_result_sheets():
@@ -64,12 +60,6 @@ def test_project_settings_without_output(forvaltningsplan_file, tmp_path):
 
     project_settings('P1', str(tmp_path), forvaltningsplan_file, create_output=False)
     assert os.listdir(str(tmp_path)) == [os.path.basename(forvaltningsplan_file)]
-
-
-def run_script(script, *args, cwd):
-    """Runs one of the command line scripts from a folder outside the package"""
-    return subprocess.run([sys.executable, os.path.join(PACKAGE_DIR, script)] + list(args), cwd=cwd,
-                          capture_output=True, text=True)
 
 
 def test_command_line_scripts_end_to_end(forvaltningsplan_file, tmp_path):

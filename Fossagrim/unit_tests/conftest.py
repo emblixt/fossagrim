@@ -15,6 +15,8 @@ Tests using them are skipped when the files are not present.
 """
 import os
 import shutil
+import subprocess
+import sys
 
 import matplotlib
 import openpyxl
@@ -27,6 +29,16 @@ REAL_FORVALTNINGSPLAN = os.path.join(TEST_DATA_DIR, 'FHF23-0007 Forvaltningsplan
 REAL_HEUREKA_RESULTS = os.path.join(TEST_DATA_DIR, 'FHF23-0007 v01_1 Heureka results.xlsx')
 REAL_PROJECT_NAME = 'FHF23-0007 v01_1'
 UNIT_TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+PACKAGE_DIR = os.path.dirname(UNIT_TEST_DIR)
+
+
+def run_script(script, *args, cwd):
+    """
+    Runs one of the command line scripts in the Fossagrim folder (e.g. 'create_heureka_input_files.py') exactly
+    as a user would, from the folder 'cwd'. Returns the subprocess.CompletedProcess (returncode, stdout, stderr)
+    """
+    return subprocess.run([sys.executable, os.path.join(PACKAGE_DIR, script)] + list(args), cwd=cwd,
+                          capture_output=True, text=True)
 
 # Column names as they appear in the real files, including line breaks and trailing white space that
 # read_excel() must strip

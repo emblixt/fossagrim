@@ -135,3 +135,59 @@ def test_real_nature_and_climate_effect(real_heureka_results):
     for species in ['Pine', 'Birch']:
         effects = get_nature_and_climate_effect(real_heureka_results, '{} {}'.format(REAL_PROJECT_NAME, species))
         assert None not in effects
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# create_heureka_input_files.py: the average stands are correct area weighted averages of the active stands.
+# The expected values are calculated directly from the Excel file with pandas, without any Fossagrim functions,
+# so that a bug in the averaging or unit conversion can not hide itself.
+# ---------------------------------------------------------------------------------------------------------------
+
+DAA_PER_HA = 10.  # 1 ha = 10 daa, so a value per daa is multiplied by 10 to get the value per ha
+M3FUB_TO_M3SK = 1.19  # Forvaltningsplan volumes are m3fub (under bark), Heureka volumes are m3sk (standing, over bark)
+CSV_TOLERANCE = 0.006  # the csv file stores floats with two decimals
+VOLUME_DESCRIPTION = 'Volym (m3sk/ha. produktiv areal)'  # description (line 1) of the volume column in the csv file
+FOREST_TYPES = {'Spruce': 'Gran', 'Pine': 'Furu', 'Birch': 'Bjørk'}  # name in output: name in Forvaltningsplan
+
+
+@pytest.fixture(scope='module')
+def real_averaged_stand_csv(tmp_path_factory):
+    """Runs create_heureka_input_files.py on the real Forvaltningsplan, and returns the csv file it creates"""
+    from Fossagrim.unit_tests.conftest import REAL_FORVALTNINGSPLAN, run_script
+
+    if not os.path.isfile(REAL_FORVALTNINGSPLAN):
+        pytest.skip('Real test data {} is not available'.format(os.path.basename(REAL_FORVALTNINGSPLAN)))
+    folder = str(tmp_path_factory.mktemp('FHF23-0007'))
+    created = run_script('create_heureka_input_files.py', 'FHF23-0007 v01', folder, REAL_FORVALTNINGSPLAN,
+                         cwd=folder)
+    assert created.returncode == 0, created.stderr
+    return os.path.join(folder, 'FHF23-0007 v01 Averaged stand data.csv')
+
+
+@pytest.mark.parametrize('forest_type', list(FOREST_TYPES.keys()))
+def test_real_average_volume_is_area_weighted(real_averaged_stand_csv, forest_type):
+    import pandas as pd
+    from Fossagrim.unit_tests.conftest import REAL_FORVALTNINGSPLAN
+
+    # Volume of the average stand in the csv file, found through the column description in line 1
+    with open(real_averaged_stand_csv, encoding='cp1252') as f:
+        descriptions = f.readline().rstrip('\n').split(';')
+    output = pd.read_csv(real_averaged_stand_csv, sep=';', header=1, encoding='cp1252')
+    volume_column = output.columns[descriptions.index(VOLUME_DESCRIPTION)]
+    row = output[output['StandId'] == 'FHF23-0007 v01 {}'.format(forest_type)]
+    assert len(row) == 1, 'Average stand for {} not found in the csv file'.format(forest_type)
+    csv_volume = float(row[volume_column].iloc[0])
+
+    # Area weighted average of 'Vol / daa' over the active stands of this forest type in the Forvaltningsplan
+    stands = pd.read_excel(REAL_FORVALTNINGSPLAN, sheet_name='data', header=7)
+    stands.columns = [c.strip() if isinstance(c, str) else c for c in stands.columns]
+    active = stands[(stands['Volum status'] == 1) &
+                    (stands['Bonitering\ntreslag'] == FOREST_TYPES[forest_type])]
+    assert len(active) > 0, 'No active {} stands in the Forvaltningsplan'.format(FOREST_TYPES[forest_type])
+    area = active['Prod.areal']
+    weighted_volume_per_daa = (area * active['Vol\n/\ndaa']).sum() / area.sum()  # m3fub/daa
+    expected = weighted_volume_per_daa * DAA_PER_HA * M3FUB_TO_M3SK  # m3sk/ha
+
+    assert csv_volume == pytest.approx(expected, abs=CSV_TOLERANCE), (
+        '{}: {} active stands, area weighted volume {:.4f} m3fub/daa -> expected {:.3f} m3sk/ha, '
+        'but the csv file has {:.3f}'.format(forest_type, len(active), weighted_volume_per_daa, expected, csv_volume))
