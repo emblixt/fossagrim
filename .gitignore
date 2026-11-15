@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Output written by scripts when run from inside the package
+Fossagrim/log.txt
+Fossagrim/utils/stand_ids
+
+# Real project (client) data used by the optional unit tests. Must not be committed.
+Fossagrim/test_data/

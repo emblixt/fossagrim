@@ -1,3 +1,6 @@
+"""
+LEGACY: one-off scripts that were used to migrate/clean up old project files. Kept for reference only.
+"""
 import os.path
 
 from pathlib import Path
@@ -6,6 +9,7 @@ import matplotlib.pyplot as plt
 import openpyxl
 
 import Fossagrim.io.fossagrim_io as fio
+import Fossagrim.legacy.legacy_io as legacy_io
 from Fossagrim.utils.definitions import heureka_standdata_keys, heureka_standdata_desc
 
 
@@ -78,7 +82,7 @@ def merge_treatment_and_stand():
                         for line in lines:
                             for ws in ['Spruce', 'Pine', 'Birch', 'Avg Stand-Spruce', 'Avg Stand-Pine', 'Avg Stand-Birch']:
                                 # print('   {}'.format(ws))
-                                treatment = fio.read_fossagrim_treatment(tf, stand_id, ws)
+                                treatment = legacy_io.read_fossagrim_treatment(tf, stand_id, ws)
                                 if None in treatment:
                                     continue
                                 if '{} {}'.format(stand_id, ws) in line:
@@ -131,7 +135,7 @@ def collect_carbon_effect_for_test_simulations(stand_file, result_file, out_file
                     continue
                 split_line = line.split(';')
                 print('Working on stand {}'.format(split_line[0]))
-                carbon_effect = fio.get_carbon_effect(result_file, split_line[0], ax=ax)
+                carbon_effect = legacy_io.get_carbon_effect(result_file, split_line[0], ax=ax)
                 if carbon_effect is None:
                     print('  Carbon effect: None')
                     carbon_effect = ''

@@ -1,94 +1,34 @@
+"""
+Plotting functions:
+    plot_raw_data()               QC plot of all variables of one (raw or combined) Heureka result
+    plot_from_heureka_results()   flexible plot of selected variables from a Heureka results file
+    qc_stand_data()               box plots of the columns of a Forvaltningsplan, to spot outliers and NaNs
+    plot_collected_stand_data()   interactive (bokeh) plot of the output of heureka_results.collect_all_stand_data()
+"""
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import os
-import unittest
 
-from bokeh.plotting import figure, show
-from bokeh.layouts import row, column
-from bokeh.models import (ColumnDataSource, Select,
-                          CustomJS, CustomJSTransform, LinearColorMapper)
-from bokeh.models import PanTool,WheelZoomTool, ResetTool, SaveTool, CrosshairTool, HoverTool, ColorBar, LogColorMapper
-from bokeh.models import (DataTable, NumberFormatter, SelectEditor, StringEditor, StringFormatter,
-                          IntEditor, TableColumn, CheckboxEditor, Div)
-from bokeh.io import output_file
-
-import Fossagrim.utils.projects as fup
-import Fossagrim.io.fossagrim_io as fio
-
-markers = ['o', 'v', '^', '<', '>', 's', 'p', 'P', '*', 'X', 'D']
-
-output_file('C:\\Users\marte\Documents\plot.html')
-
-def find_first_index(table, key, value):
-    found = False
-    i = None
-    if isinstance(key, list) and isinstance(value, list):
-        for i, this_value in enumerate(table[key[0]]):
-            if (value[0] in this_value) and (value[1] in table[key[1]][i]):
-                found = True
-                break
-    else:
-        for i, this_value in enumerate(table[key]):
-            if this_value == value:
-                found = True
-                break
-    if found:
-        return i
-    else:
-        return None
-
-
-def plot_plant_density():
-    projects = ['FHF23-0{}'.format(_x) for _x in ['03', '04', '05', '06', '07', '08', '09', '10', '12']]
-    spruce_sis = [];
-    pine_sis = [];
-    spruce_plant_den = [];
-    pine_plant_den = []
-
-    for project_tag in projects:
-        print(project_tag)
-        _, _, _, _, _, _, _, csv_stand_file, csv_treatment_file = fup.project_settings(project_tag)
-        this_table = pd.read_csv(csv_stand_file, sep=';', header=1, encoding="ISO-8859-1")
-        i_spruce = find_first_index(this_table, 'SiteIndexSpecies', 'G')
-        i_pine = find_first_index(this_table, 'SiteIndexSpecies', 'T')
-        if i_spruce is None:
-            spruce_sis.append(np.nan)
-        else:
-            spruce_sis.append(this_table['SIS'][i_spruce])
-
-        if i_pine is None:
-            pine_sis.append(np.nan)
-        else:
-            pine_sis.append(this_table['SIS'][i_pine])
-
-        this_table = pd.read_csv(csv_treatment_file, sep=';', header=1, encoding="ISO-8859-1")
-        i_spruce = find_first_index(this_table, ['StandId', 'Treatment'], ['Spruce', 'Planting'])
-        i_pine = find_first_index(this_table, ['StandId', 'Treatment'], ['Pine', 'Planting'])
-        if i_spruce is None:
-            spruce_plant_den.append(np.nan)
-        else:
-            spruce_plant_den.append(this_table['PlantDensity'][i_spruce])
-        if i_pine is None:
-            pine_plant_den.append(np.nan)
-        else:
-            pine_plant_den.append(this_table['PlantDensity'][i_pine])
-
-    fig, ax = plt.subplots()
-    for i, project_tag in enumerate(projects):
-        ax.scatter(spruce_sis[i], spruce_plant_den[i], c='b', marker=markers[i], label=project_tag)
-        ax.scatter(pine_sis[i], pine_plant_den[i], c='g', marker=markers[i], label='_nolegend_')
-
-    ax.set_xlabel('SIS')
-    ax.set_ylabel('Plant density [plants/ha]')
-    ax.set_title('Plant density vs Bonity (blue = Spruce)')
-    ax.legend()
-    plt.show()
-
-    return spruce_sis, pine_sis, spruce_plant_den, pine_plant_den
+from Fossagrim.utils.definitions import HEUREKA_CSV_ENCODING
 
 
 def plot_raw_data(data_dict, data_tag, my_title, qc_plot_dir):
+    """
+    Plots all variables (except Year, Treatment and Unit) against Year, and saves the plot as
+    '<my_title>_<data_tag>.png' in qc_plot_dir (created if missing)
+
+    :param data_dict:
+        dict or pandas DataFrame with the key 'Year'
+    :param data_tag:
+        str, e.g. the sheet name
+    :param my_title:
+        str
+    :param qc_plot_dir:
+        str
+    """
+    os.makedirs(qc_plot_dir, exist_ok=True)
     fig, ax = plt.subplots(figsize=(12, 12))
     _x = data_dict['Year']
     _count = 0
@@ -113,6 +53,7 @@ def plot_raw_data(data_dict, data_tag, my_title, qc_plot_dir):
     ax.grid(True)
     ax.legend()
     fig.savefig(os.path.join(qc_plot_dir, '{}_{}.png'.format(my_title.lower().replace(' ', '_'), data_tag)))
+    plt.close(fig)
 
 
 def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='Year',
@@ -130,11 +71,17 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
         str or list of str
         each string is the (partial) name of a parameter listed in the above results Excel file
     :param ax:
+        matplotlib axes to plot in. A new figure is created when None
     :param x_key:
+        str
+        (partial) name of the variable to use on the x axis
     :param diff_sheets:
         bool
         If True, it plots the difference sheet[0] - sheet[1] for each listed param.
         All other listed sheets are ignored
+    :param barchart:
+        bool
+        If True (and diff_sheets is False), the parameters and sheets are plotted as stacked bars
     :param year_zero:
         float
         When 'x_key' is Year, this value is added, so it acts as a start year
@@ -164,14 +111,23 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
     diff = None
     width = kwargs.pop('width', 4.0)
 
+    from Fossagrim.io.heureka_results import read_raw_heureka_results
+
     # read the different sheets from the results Excel file
     data = []
+    read_sheets = []
     for sheet in sheets:
         try:
-            data.append(fio.read_raw_heureka_results(result_file, sheet))
-        except KeyError as error:
+            this_data = read_raw_heureka_results(result_file, sheet)
+        except (KeyError, ValueError) as error:
             print(error)
             continue
+        if this_data is not None:
+            data.append(this_data)
+            read_sheets.append(sheet)
+    sheets = read_sheets
+    if diff_sheets and len(sheets) < 2:
+        raise ValueError('Could not read two sheets from {} to calculate the difference'.format(result_file))
 
     # check if parameters are available in all sheets
     for d, sheet in zip(data, sheets):
@@ -190,7 +146,7 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
     bottom_sheets = None
     i = 0
     for d, sheet in zip(data, sheets):
-        x = d[[_x for _x in list(d.keys()) if x_key.lower() in _x.lower()][0]].values
+        x = np.asarray(d[[_x for _x in list(d.keys()) if x_key.lower() in _x.lower()][0]].values, dtype=float)
         if x_key == 'Year':
             x += year_zero
         if i == 0:
@@ -216,12 +172,9 @@ def plot_from_heureka_results(result_file, sheets, params=None, ax=None, x_key='
                 else:
                     ax.plot(x, y, label='{} {}'.format(p, sheet), **kwargs)
 
-        if not diff_sheets:
-            raise NotImplementedError('Problem with bottom_sheets - need check')
-        # TODO
-        # XXX
-        # problems with the line below, which is really necessary when diff_sheets is False
-        # bottom_sheets += bottom_params
+        if barchart and not diff_sheets:
+            # stack the bars of the next sheet on top of this one
+            bottom_sheets += bottom_params
         i += 1
 
     ax.set_title(os.path.basename(result_file))
@@ -245,8 +198,7 @@ def qc_stand_data(stand_data_table, stand_id, qc_plot_dir):
         panda table
         Output from fossagrim_io.read_excel
     """
-    from Fossagrim.utils.definitions import fossagrim_standdata_keys
-
+    os.makedirs(qc_plot_dir, exist_ok=True)
     text_style = {'fontsize': 'x-small', 'bbox': {'facecolor': 'w', 'alpha': 0.5}}
     text_style_flag = {'fontsize': 'x-small', 'bbox': {'facecolor': 'r', 'alpha': 0.5}}
     flierprops = dict(markerfacecolor = 'r')
@@ -311,9 +263,11 @@ def qc_stand_data(stand_data_table, stand_id, qc_plot_dir):
 
     for i, fig in enumerate([fig1, fig2, fig3]):
         fig.savefig(os.path.join(qc_plot_dir, 'bestand qc {}.png'.format(i+1)))
+        plt.close(fig)
 
 
 def list_duplicates(seq):
+    """Returns a list of the elements that occur more than once in seq"""
     seen = set()
     seen_add = seen.add
     # adds all elements it doesn't know yet to seen and all other to seen_twice
@@ -322,12 +276,29 @@ def list_duplicates(seq):
     return list(seen_twice)
 
 
-def plot_collected_stand_data(csv_file):
+def plot_collected_stand_data(csv_file, html_file=None):
     """
-    Uses Bokeh to create an interactive scatter plot of
+    Uses Bokeh to create an interactive scatter plot of the nature and climate effects of the stands collected
+    by heureka_results.collect_all_stand_data(), and opens it in the browser
+
     :param csv_file:
+        str
+        Heureka csv file with the effects in the UserDefinedVariable5-7 columns
+    :param html_file:
+        str
+        Optional name of the html file to save the plot in
     :return:
+        None
     """
+    from bokeh.plotting import figure, show
+    from bokeh.layouts import row, column
+    from bokeh.models import ColumnDataSource, Select, CustomJS, HoverTool
+    from bokeh.models import DataTable, NumberFormatter, StringFormatter, TableColumn, Div
+    from bokeh.io import output_file
+
+    if html_file is not None:
+        output_file(html_file)
+
     info_text = """
     <h1> Information</h1>
     This plot shows some modelled climate and nature benefits that can be gained by invoking a 30 year
@@ -386,7 +357,7 @@ def plot_collected_stand_data(csv_file):
     s_drop = Select(title='Size', value='Area [ha]', options=list(param_dict.keys()))
 
     # read csv file and drop non-necessary columns
-    table = pd.read_csv(csv_file, sep=';', header=1, encoding='ISO-8859-1')
+    table = pd.read_csv(csv_file, sep=';', header=1, encoding=HEUREKA_CSV_ENCODING)
     drop_these = ['TotalArea', 'CountyCode', 'Altitude', 'Latitude', 'SoilMoistureCode',
                 'VegetationType', 'Peat', 'InventoryYear', 'DGV', 'DG', 'SoilMoistureCode', 'VegetationType',
                 'Peat', 'InventoryYear', 'DGV', 'DG', 'G', 'V', 'PropPine', 'PropSpruce', 'PropBirch', 'PropAspen',
@@ -404,8 +375,9 @@ def plot_collected_stand_data(csv_file):
                 'LastFertilizationYear', 'LastRegenerationYear', 'RegenerationMethod', 'RegenerationSpecies',
                 'RegenerationBreeded', 'Note', 'UserDefinedVariable1_TaxType', 'UserDefinedVariable2_RotationPeriod',
                 'UserDefinedVariable3_ThinningYear', 'UserDefinedVariable4_PlantDensity', 'UserDefinedVariable8',
-                'UserDefinedVariable9', 'UserDefinedVariable10', 'SetAsideType']
-    table = table.drop(columns=drop_these)
+                'PlantDensity', 'UniqueID', 'UserDefinedVariable9', 'UserDefinedVariable10', 'SetAsideType']
+    # errors='ignore' because older files have other names for some of the user defined columns
+    table = table.drop(columns=drop_these, errors='ignore')
 
     # Replace the tree types with human readable text, and associate a color each tree type
     tt = table['SiteIndexSpecies'].values
@@ -565,33 +537,3 @@ def plot_collected_stand_data(csv_file):
 
     div = Div(text=info_text, width=600)
     show(column(row(p, column(x_drop, y_drop, s_drop), div), sum_stands_table, stands_table))
-
-
-class TestCases(unittest.TestCase):
-    def test_list_duplicates(self):
-        print(list_duplicates(['A', 'B', 'C', 'A']))
-        print(list_duplicates([1, 2, 3, 1]))
-
-    def test_qc_stand_data(self):
-        f = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0014 Arne Tag\\Bestandsoversikt 16052024.xlsx"
-        table = fio.read_excel(f, 7, 0)
-        qc_stand_data(table, os.path.basename(f), 'C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-014 Arne Tag\\QC_plots')
-        plt.show()
-
-    def test_plot_heureka_results(self):
-        result_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\FHF24-0016 Margrete Folsland\\FHF24-0016 Heureka results.xlsx"
-        sheets = ["FHF24-0016 Pine PRES", "FHF24-0016 Pine BAU"]
-        params = "Total Carbon Stock (dead wood, soil, trees, stumps and roots)"
-        diff_sheets = True
-        diff = plot_from_heureka_results(
-            result_file,
-            sheets=sheets,
-            params=params,
-            diff_sheets=diff_sheets
-        )
-        print(diff)
-        plt.show()
-
-    def test_plot_collected_stand_data(self):
-       csv_file = "C:\\Users\\marte\\OneDrive - Fossagrim AS\\Prosjektskoger\\TEST COLLECT STAND DATA.csv"
-       plot_collected_stand_data(csv_file)

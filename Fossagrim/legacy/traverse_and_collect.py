@@ -1,4 +1,6 @@
 """
+LEGACY: unfinished, kept for reference only.
+
 These scripts are meant to traverse the set of input and output files in Fossagrim and collect interesting
 nature and climate parameters that then can be plotted
 

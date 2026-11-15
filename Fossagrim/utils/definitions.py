@@ -1,9 +1,46 @@
-# https://www.heurekaslu.se/wiki/Import_of_stand_register
-import pandas as pd
-import datetime
-import numpy as np
+"""
+Shared constants for the Fossagrim <-> Heureka workflow.
 
+Contents
+--------
+* Column names and layout of the Fossagrim "Forvaltningsplan" (a.k.a. "Bestandsutvalg") Excel file
+* Column names (and descriptions) of the Heureka stand register import file ("StandData.csv"), see
+  https://www.heurekaslu.se/wiki/Import_of_stand_register
+* Rules for how each Forvaltningsplan column is treated when stands are averaged
+* Colors, line styles and line widths used in plots and in the monetization Excel file
+"""
+
+# Unit conversion: cubic meter solid volume under bark (m3fub) -> cubic meter standing volume over bark (m3sk)
 m3fub_to_m3sk = 1.19
+
+# ---------------------------------------------------------------------------------------------------------------
+# Layout of the Fossagrim "Forvaltningsplan" Excel file
+# ---------------------------------------------------------------------------------------------------------------
+FORVALTNINGSPLAN_DATA_SHEET = 'data'  # Sheet with one row per stand
+FORVALTNINGSPLAN_HEADER_ROW = 7  # Zero-based row index of the column headers in the data sheet
+FORVALTNINGSPLAN_QC_SHEET = 'Forvaltning'  # Sheet used by the pdf consistency checks (qc_input_pdfs.py)
+FORVALTNINGSPLAN_QC_HEADER_ROW = 6
+DEFAULT_STAND_ID_KEY = 'Fossagrim ID'  # Column that uniquely identifies a stand
+SPECIES_KEY = 'Bonitering\ntreslag'  # Column with the dominant tree species of a stand
+UNPRODUCTIVE_SPECIES = ['Uproduktiv', '-']  # Values in SPECIES_KEY that mark stands which are never exported
+SPECIES_NAMES = {
+    # English species name used in file/sheet names: values in SPECIES_KEY that map to it
+    'Spruce': ['Gran', 'G', 'Spruce'],
+    'Pine': ['Furu', 'F', 'Pine'],
+    'Birch': ['Bjørk', 'B', 'Birch'],
+}
+HEUREKA_SITE_INDEX_SPECIES = {'Gran': 'G', 'Furu': 'T', 'Bjørk': 'B'}  # Norwegian name -> Heureka species code
+
+# ---------------------------------------------------------------------------------------------------------------
+# Heureka simulations and result files
+# ---------------------------------------------------------------------------------------------------------------
+METHODS = ['BAU', 'PRES']  # "Business as usual" and "Preservation"
+HEUREKA_PERIOD_LENGTH = 5  # Years per Heureka simulation period
+REARRANGED_RESULTS_SHEET = 'Rearranged results'
+# Encoding of the semicolon separated csv files that are imported into Heureka. Heureka is a Windows program,
+# and these files have always been written with the Windows default (cp1252) encoding.
+HEUREKA_CSV_ENCODING = 'cp1252'
+EXCEL_MAX_SHEET_NAME_LENGTH = 31
 
 standard_colors = {
     'time_1': '#D9E1F2',
@@ -333,23 +370,23 @@ def translate_keys_from_fossagrim_to_heureka():
     return translation
 
 
-def test_length_of_keys():
+def validate_key_definitions():
+    """
+    Sanity check of the key lists in this module. Raises ValueError if they are inconsistent.
+    Called from the unit tests.
+    """
     if len(heureka_standdata_keys) != len(heureka_standdata_desc):
         raise ValueError('Length of heureka keys ({}) is not same as description ({})'.format(
             len(heureka_standdata_keys), len(heureka_standdata_desc)))
 
-    if heureka_standdata_keys.index('DGV') != heureka_standdata_desc.index('Grundytevägd medeldiameter (cm)'):
-        raise ValueError('Position of DGV ({}) does not match with position of its description ({})'.format(
-            heureka_standdata_desc.index('DGV'), heureka_standdata_desc.index('Grundytevägd medeldiameter (cm)')
-        ))
+    for key, desc in [('DGV', 'Grundytevägd medeldiameter (cm)'), ('V', 'Volym (m3sk/ha. produktiv areal)')]:
+        if heureka_standdata_keys.index(key) != heureka_standdata_desc.index(desc):
+            raise ValueError('Position of {} ({}) does not match with position of its description ({})'.format(
+                key, heureka_standdata_keys.index(key), heureka_standdata_desc.index(desc)))
 
-    if heureka_standdata_keys.index('V') != heureka_standdata_desc.index('Volym (m3sk/ha. produktiv areal)'):
-        raise ValueError('Position of V ({}) does not match with position of its description ({})'.format(
-            heureka_standdata_desc.index('V'), heureka_standdata_desc.index('Volym (m3sk/ha. produktiv areal)')
-        ))
+    if len(heureka_treatment_keys) != len(heureka_treatment_desc):
+        raise ValueError('Length of heureka treatment keys and descriptions differ')
 
-
-def test_key_existance():
     for key_list in [fossagrim_keys_to_average_over, fossagrim_keys_to_sum_over, fossagrim_keys_to_most_of]:
         for key in key_list:
             if key not in fossagrim_standdata_keys:

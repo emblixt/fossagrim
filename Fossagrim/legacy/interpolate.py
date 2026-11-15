@@ -1,3 +1,6 @@
+"""
+LEGACY: kept for reference only, not used by the active workflow and not covered by unit tests.
+"""
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt

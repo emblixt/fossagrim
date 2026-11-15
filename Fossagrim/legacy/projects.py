@@ -1,3 +1,6 @@
+"""
+LEGACY: kept for reference only, not used by the active workflow and not covered by unit tests.
+"""
 import os
 import numpy as np
 import pandas as pd
@@ -5,6 +8,7 @@ import openpyxl
 # from copy import deepcopy
 import Fossagrim.plotting.misc_plots as fpp
 import Fossagrim.io.fossagrim_io as fio
+import Fossagrim.legacy.legacy_io as legacy_io
 
 methods = ['BAU', 'PRES']  # "Business as usual" and "Preservation"
 
@@ -31,7 +35,7 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
 
     # TODO
     # Add the treatment to the csv stand file instead, among the UserDefinedVariables, then we don't need this file
-    fio.export_fossagrim_treatment(
+    legacy_io.export_fossagrim_treatment(
         _stand_file,
         _csv_treatment_file,
         average_over=_average_over,

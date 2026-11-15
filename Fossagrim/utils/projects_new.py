@@ -1,21 +1,33 @@
+"""
+Project workflow driven by the project settings Excel file ("ProjectForestsSettings.xlsx").
+
+Edit the variables under `if __name__ == '__main__':` and run this file:
+    1. fix_import = True:   QC the Forvaltningsplan (plots, and pdf consistency checks if the Hovedtallsrapport
+                            and Sumtallsrapport are given in the settings file), create the stand register csv
+                            file for Heureka and an empty results file
+    2. Run the simulations in Heureka and paste the results into the results file
+    3. fix_import = False:  rearrange the Heureka results
+"""
 import os
-import numpy as np
-import pandas as pd
-import openpyxl
-# from copy import deepcopy
+
 import Fossagrim.plotting.misc_plots as fpp
 import Fossagrim.io.fossagrim_io as fio
-
-methods = ['BAU', 'PRES']  # "Business as usual" and "Preservation"
+from Fossagrim.utils.definitions import FORVALTNINGSPLAN_DATA_SHEET, FORVALTNINGSPLAN_HEADER_ROW
+from Fossagrim.utils.project_setup import (
+    averaged_stand_csv_file, build_result_sheets, build_combine_sheets, create_empty_results_file)
 
 
 def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_over, _stand_id_key, _project_tag,
                    _hrapp, _srapp,
                    _verbose=False, **_kwargs):
+    """
+    QC the Forvaltningsplan and create the stand register csv file that is imported into Heureka.
+    The arguments are the outputs of project_settings(). _csv_treatment_file and _kwargs are not used.
+    """
     from Fossagrim.qc_input_pdfs import pdf_consistency
 
     # QC input table
-    table = fio.read_excel(_stand_file, 7, 'data')
+    table = fio.read_excel(_stand_file, FORVALTNINGSPLAN_HEADER_ROW, FORVALTNINGSPLAN_DATA_SHEET)
     fpp.qc_stand_data(
         table,
         os.path.basename(_stand_file),
@@ -24,7 +36,7 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
 
     # QC input
     if _hrapp is not None and _srapp is not None:
-        print('WILL START THE TEST')
+        print('Checking the Forvaltningsplan against the Hovedtallsrapport and Sumtallsrapport')
         pdf_consistency(_stand_file, _hrapp, _srapp, _project_tag)
 
     fio.export_fossagrim_stand_to_heureka(
@@ -33,7 +45,7 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
         average_over=_average_over,
         stand_id_key=_stand_id_key,
         average_name='{} '.format(_project_tag),
-        sheet_name='data',
+        sheet_name=FORVALTNINGSPLAN_DATA_SHEET,
         verbose=_verbose
     )
 
@@ -50,7 +62,10 @@ def arrange_import(_stand_file, _csv_stand_file, _csv_treatment_file, _average_o
 
 
 def arrange_results(_result_file, _sheet_names, _combine_sheets, _monetization_file, _verbose=False, **_kwargs):
-    # sheet names in the resulting Excel file
+    """
+    Rearrange the Heureka results (see heureka_results.rearrange_raw_heureka_results()), and fill in the
+    monetization file if one is given.
+    """
     write_monetization_file = \
         fio.rearrange_raw_heureka_results(
             _result_file, _sheet_names, _combine_sheets, monetization_file=_monetization_file, verbose=_verbose)
@@ -81,7 +96,13 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
         If True it goes through the whole process and creates results files,
         If False, it only returns the first few arguments before creating any files and thereby
         avoiding the possibility of overwriting the results file.
+    :param _verbose:
+        Bool
     :return:
+        tuple of
+        (project folder, stand file, average_over, stand id key, result file, result sheets, combine sheets,
+         monetization file (always None), csv stand file, csv treatment file (no longer created),
+         hovedtallsrapport or None, sumtallsrapport or None, kwargs (always empty))
     """
     p_tabl = fio.read_excel(_project_settings_file, 1, 'Settings')
 
@@ -127,52 +148,22 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
     _stand_file = os.path.join(_project_folder, p_tabl['Stands file'][i])
     _result_file = os.path.join(_project_folder, p_tabl['Results file'][i])
     # _monetization_file = os.path.join(_project_folder, p_tabl['Monetization file'][i])  # not calculated in Python
-    _csv_stand_file = os.path.join(_project_folder, '{} Averaged stand data.csv'.format(_project_name))
+    _csv_stand_file = averaged_stand_csv_file(_project_folder, _project_name)
     _csv_treatment_file = os.path.join(_project_folder, '{} Averaged treatment.csv'.format(_project_name))
 
     _average_over, _active_prod_areas, _active_prod_areas_fract = fio.get_active_forests_from_stand(
-        _stand_file, stand_id_key=_stand_id_key, sheet_name='data')
+        _stand_file, stand_id_key=_stand_id_key, sheet_name=FORVALTNINGSPLAN_DATA_SHEET)
 
-    # Excel can only handle sheet names that are shorter than 31 characters, and the longest string
-    # we add is "Spruce PRES", which is 11 characters long.
-    if len(_project_name) >= 20:
-        tmp_project_name = _project_name[:10]
-    else:
-        tmp_project_name = _project_name
-    _result_sheets = \
-        ['{} {} {}'.format(tmp_project_name, _x, _y) for _x, _y in
-         zip(np.repeat(list(_average_over.keys()), 2), methods * len(_average_over))]
-         # zip(np.repeat(list(_average_over.keys()), max(2, len(_average_over))), methods * len(_average_over))]
+    # The combine fractions are the fractions of the active productive area of each wood species
+    forest_types = list(_active_prod_areas_fract.keys())
+    _result_sheets = build_result_sheets(_project_name, forest_types, verbose=_verbose)
 
-    # We could extract the combine fractions directly from the stand file (Bestandsutvalg,
-    # through "fio.get_active_forests_from_stand()" above) because it should
-    # contain the areas/volumes of each of the different wood species
     for key, value in _active_prod_areas.items():
         print('{} stands have a total area of {} daa, which corresponds to a fraction of {:.3} of the total area'.format(
             key, sum(value), _active_prod_areas_fract[key]))
 
-    _combine_sheets = {}
-    # _kwargs, combine_fractions = fio.get_kwargs_from_stand(_stand_file, _project_settings_file, _project_tag)
-    # forest_types = [_x.strip() for _x in p_tabl['Forest types'][i].split(',')] # From OLD projects.py
-
-    # With the new set-up (reading active productive area and fractions directly from Bestandsutvalg file)
-    combine_fractions = list(_active_prod_areas_fract.values())
-    forest_types = list(_active_prod_areas_fract.keys())
-
-    if len(combine_fractions) < 2:
-        # only one forest type to "combine", so no combination of forest types necessary,
-        # and the 'combine_fraction' is overridden using a factor of 1
-        _combine_fractions = [1.]
-    else:
-        _combine_fractions = combine_fractions
-
-    for j, method in enumerate(methods):
-        _this_list = []
-        for k, c_frac in enumerate(_combine_fractions):
-            _this_list.append(_result_sheets[j + 2 * k])
-            _this_list.append(c_frac)
-        _combine_sheets['{} Combined Stands {} {}'.format(_project_name, '-and-'.join(forest_types), method)] = \
-            _this_list
+    _combine_sheets = build_combine_sheets(
+        _project_name, forest_types, list(_active_prod_areas_fract.values()), _result_sheets)
 
     if not _fix_import:
         return (_project_folder, _stand_file, _average_over, _stand_id_key, _result_file, _result_sheets,
@@ -194,11 +185,7 @@ def project_settings(_project_name, _project_settings_file, _fix_import: bool = 
         create_results_file = True
 
     if create_results_file:
-        writer = pd.ExcelWriter(_result_file, engine='xlsxwriter')
-        wb = writer.book
-        for _sheet in _result_sheets:
-            _ = wb.add_worksheet(_sheet)
-        writer.close()
+        create_empty_results_file(_result_file, _result_sheets)
 
     return _project_folder, _stand_file, _average_over, _stand_id_key, _result_file, _result_sheets, _combine_sheets, \
         None, _csv_stand_file, _csv_treatment_file, _hrapp, _srapp, {}
