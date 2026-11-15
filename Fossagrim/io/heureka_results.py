@@ -6,12 +6,14 @@ Raw Heureka results
 A simulation result is copied from Heureka (or exported from the Woods platform) into its own sheet of the
 "<project> Heureka results.xlsx" file. Each sheet has one row per variable:
 
-    | Variable                 | <category> | Unit  | Period 0 | Period 1 | ...
-    | Year                     |            | year  | 2025     | 2030     | ...
-    | Treatment                |            |       | None     | Thinning | ...
-    | Soil Carbon Stock        |            | ton/ha| 50.1     | 50.3     | ...
+    | Result type         | Variable           | Unit     | Period 0 [0] | Period 0 [1] | Period 1 | ...
+    | Carbon and Nitrogen | Soil Carbon Stock  | ton C/ha | 66.34        |              | 97.37    | ...
+    | Treatments          | Treatment          |          | FinalFelling | Planting     | None     | ...
+    | Treatments          | Year               |          | 0            | 2            | 5        | ...
 
-Some treatments split a 5 year period into sub-periods; those columns are dropped when reading.
+Only the 'Variable' column is used to find the variables (the column order before 'Unit' does not matter).
+Some treatments split a 5 year period into sub-periods (e.g. 'Period 0 [1]' above); those columns are dropped
+when reading.
 
 Rearranged results
 ------------------
@@ -39,7 +41,7 @@ DOWNED_DEADWOOD = 'Downed Deadwood >=20cm'
 # Columns that are copied (not area weighted) when forest types are combined
 NON_NUMERIC_VARIABLES = ['Treatment', 'Year', 'UserDefined8 : UniqueID']
 
-# Column with the first period in a raw Heureka results sheet; columns before it are Variable, category, Unit
+# Column with the first period in a raw Heureka results sheet; columns before it are Result type, Variable, Unit
 FIRST_PERIOD_COLUMN = 3
 UNIT_COLUMN = 2
 

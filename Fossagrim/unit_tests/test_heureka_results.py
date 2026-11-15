@@ -47,11 +47,11 @@ def test_read_raw_heureka_results(heureka_results_factory):
 def test_read_raw_heureka_results_selected_variables(heureka_results_factory):
     f = heureka_results_factory({'S': SPRUCE_BAU})
     result = read_raw_heureka_results(f, 'S', read_only_these_variables=['Year', SOIL_CARBON])
-    assert list(result.keys()) == ['Year', SOIL_CARBON]
+    assert set(result.keys()) == {'Year', SOIL_CARBON}
 
 
 def test_read_raw_heureka_results_without_year(heureka_results_factory):
-    rows = [row for row in SPRUCE_BAU if row[0] != 'Year']
+    rows = [row for row in SPRUCE_BAU if row[1] != 'Year']
     f = heureka_results_factory({'S': rows})
     assert read_raw_heureka_results(f, 'S') is None
 
@@ -116,7 +116,7 @@ def test_rearrange_refuses_to_overwrite(heureka_results_factory, capsys):
 
 
 def test_rearrange_missing_sheet_raises(heureka_results_factory):
-    rows = [row for row in SPRUCE_BAU if row[0] != 'Year']
+    rows = [row for row in SPRUCE_BAU if row[1] != 'Year']
     f = heureka_results_factory({'No year': rows})
     with pytest.raises(ValueError):
         rearrange_raw_heureka_results(f, ['No year'], None)

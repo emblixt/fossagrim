@@ -112,8 +112,8 @@ python -m pytest
 ```
 
 The tests are in `Fossagrim/unit_tests`. Most of them use small synthetic files that are created on the fly
-(see `conftest.py`). Tests in `test_real_data.py` use the real Forvaltningsplan in `Fossagrim/test_data/`, which is
-tracked in git. These tests are skipped if the file is missing.
+(see `conftest.py`). Tests in `test_real_data.py` use the real FHF23-0007 Forvaltningsplan and Heureka results in `Fossagrim/test_data/`, which are
+tracked in git. These tests are skipped if the files are missing.
 
 `Fossagrim/legacy/manual_checks.py` contains older manual checks that use files on the Fossagrim OneDrive. They are
 not part of the automatic test suite.

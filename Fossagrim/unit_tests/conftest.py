@@ -9,10 +9,12 @@ Small, made up, versions of the files used in the workflow, written to a tempora
 
 Real data
 ---------
-real_forvaltningsplan: the real FHF23-0007 Forvaltningsplan in Fossagrim/test_data. Tests using it are skipped
-when the file is not present.
+real_forvaltningsplan:    the real FHF23-0007 Forvaltningsplan in Fossagrim/test_data
+real_heureka_results:     the real Heureka results of the same project (project name 'FHF23-0007 v01_1')
+Tests using them are skipped when the files are not present.
 """
 import os
+import shutil
 
 import matplotlib
 import openpyxl
@@ -22,6 +24,8 @@ matplotlib.use('Agg')  # never open plot windows during tests
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'test_data')
 REAL_FORVALTNINGSPLAN = os.path.join(TEST_DATA_DIR, 'FHF23-0007 Forvaltningsplan_v01_1.xlsx')
+REAL_HEUREKA_RESULTS = os.path.join(TEST_DATA_DIR, 'FHF23-0007 v01_1 Heureka results.xlsx')
+REAL_PROJECT_NAME = 'FHF23-0007 v01_1'
 UNIT_TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Column names as they appear in the real files, including line breaks and trailing white space that
@@ -91,10 +95,11 @@ def raw_heureka_rows(years, variables):
     :param variables:
         dict of variable name: (unit, list of values, one per period)
     """
-    rows = [['Variable', 'Category', 'Unit'] + ['Period {}'.format(i) for i in range(len(years))],
-            ['Year', 'Treatments', 'year'] + list(years)]
+    # Same column layout as results copied from Heureka: Result type | Variable | Unit | Period 0 | Period 1 | ...
+    rows = [['Result type', 'Variable', 'Unit'] + ['Period {}'.format(i) for i in range(len(years))]]
     for name, (unit, values) in variables.items():
-        rows.append([name, 'Results', unit] + list(values))
+        rows.append(['Results', name, unit] + list(values))
+    rows.append(['Treatments', 'Year', None] + list(years))
     return rows
 
 
@@ -125,3 +130,13 @@ def real_forvaltningsplan():
     if not os.path.isfile(REAL_FORVALTNINGSPLAN):
         pytest.skip('Real test data {} is not available'.format(os.path.basename(REAL_FORVALTNINGSPLAN)))
     return REAL_FORVALTNINGSPLAN
+
+
+@pytest.fixture
+def real_heureka_results(tmp_path):
+    """A copy (so the tests can write to it) of the real Heureka results"""
+    if not os.path.isfile(REAL_HEUREKA_RESULTS):
+        pytest.skip('Real test data {} is not available'.format(os.path.basename(REAL_HEUREKA_RESULTS)))
+    copy = str(tmp_path / os.path.basename(REAL_HEUREKA_RESULTS))
+    shutil.copy(REAL_HEUREKA_RESULTS, copy)
+    return copy
