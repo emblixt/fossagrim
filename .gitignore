@@ -10,5 +10,3 @@ dist/
 Fossagrim/log.txt
 Fossagrim/utils/stand_ids
 
-# Real project (client) data used by the optional unit tests. Must not be committed.
-Fossagrim/test_data/

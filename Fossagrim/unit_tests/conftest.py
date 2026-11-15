@@ -10,7 +10,7 @@ Small, made up, versions of the files used in the workflow, written to a tempora
 Real data
 ---------
 real_forvaltningsplan: the real FHF23-0007 Forvaltningsplan in Fossagrim/test_data. Tests using it are skipped
-when the file is not present (it is client data and is not committed to git).
+when the file is not present.
 """
 import os
 
