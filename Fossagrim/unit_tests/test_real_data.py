@@ -191,3 +191,120 @@ def test_real_average_volume_is_area_weighted(real_averaged_stand_csv, forest_ty
     assert csv_volume == pytest.approx(expected, abs=CSV_TOLERANCE), (
         '{}: {} active stands, area weighted volume {:.4f} m3fub/daa -> expected {:.3f} m3sk/ha, '
         'but the csv file has {:.3f}'.format(forest_type, len(active), weighted_volume_per_daa, expected, csv_volume))
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# rearrange_heureka_results.py: the combined results are the area weighted sums of the forest types.
+# The expected values are calculated directly from the Excel files with pandas/openpyxl, without any Fossagrim
+# functions:
+#   fraction of a forest type = sum of 'Prod.areal' of its active stands / sum of 'Prod.areal' of all active stands
+#   combined value            = sum over forest types of (fraction x value in the raw Heureka sheet)
+# for every variable and every 5 year period (Heureka sub-periods, years that are not a multiple of 5, are dropped)
+# ---------------------------------------------------------------------------------------------------------------
+
+COMBINED_FOREST_TYPES = ['Spruce', 'Pine', 'Birch']  # order used in the sheet names of the combined results
+COPIED_VARIABLES = ['Treatment', 'Year']  # copied, not area weighted, in the combined results
+
+
+@pytest.fixture(scope='module')
+def real_rearranged_results(tmp_path_factory):
+    """Runs rearrange_heureka_results.py on a copy of the real Heureka results, and returns the copy"""
+    import shutil
+    from Fossagrim.unit_tests.conftest import (REAL_FORVALTNINGSPLAN, REAL_HEUREKA_RESULTS, REAL_PROJECT_NAME,
+                                               run_script)
+
+    for f in [REAL_FORVALTNINGSPLAN, REAL_HEUREKA_RESULTS]:
+        if not os.path.isfile(f):
+            pytest.skip('Real test data {} is not available'.format(os.path.basename(f)))
+    folder = str(tmp_path_factory.mktemp('FHF23-0007 rearrange'))
+    results_file = os.path.join(folder, os.path.basename(REAL_HEUREKA_RESULTS))
+    shutil.copy(REAL_HEUREKA_RESULTS, results_file)
+    rearranged = run_script('rearrange_heureka_results.py', REAL_PROJECT_NAME, folder, REAL_FORVALTNINGSPLAN,
+                            results_file, cwd=folder)
+    assert rearranged.returncode == 0, rearranged.stderr
+    return results_file
+
+
+def independent_area_fractions():
+    """Fraction of the total active productive area of each forest type, straight from the Forvaltningsplan"""
+    import pandas as pd
+    from Fossagrim.unit_tests.conftest import REAL_FORVALTNINGSPLAN
+
+    stands = pd.read_excel(REAL_FORVALTNINGSPLAN, sheet_name='data', header=7)
+    stands.columns = [c.strip() if isinstance(c, str) else c for c in stands.columns]
+    active = stands[stands['Volum status'] == 1]
+    total_area = active['Prod.areal'].sum()
+    return {forest_type: active.loc[active['Bonitering\ntreslag'] == norwegian, 'Prod.areal'].sum() / total_area
+            for forest_type, norwegian in FOREST_TYPES.items()}
+
+
+def independent_raw_sheet(workbook, sheet_name):
+    """
+    The values of a raw Heureka sheet (Result type | Variable | Unit | Period ...) at the 5 year periods,
+    as {variable: [value per period]}, read cell by cell with openpyxl
+    """
+    rows = {row[1]: list(row[3:]) for row in workbook[sheet_name].iter_rows(min_row=2, values_only=True)}
+    keep = [i for i, year in enumerate(rows['Year']) if year is not None and float(year) % 5 == 0]
+    return {variable: [values[i] for i in keep] for variable, values in rows.items()}
+
+
+def rearranged_table(workbook, title):
+    """
+    One table in the 'Rearranged results' sheet: the title is in row 1, the variable names in row 3 (after the
+    index column) and the values from row 4. Returns {variable: [value per period]}
+    """
+    ws = workbook['Rearranged results']
+    start = [c for c in range(1, ws.max_column + 1) if ws.cell(1, c).value == title]
+    assert len(start) == 1, 'Table "{}" not found in the Rearranged results sheet'.format(title)
+    table = {}
+    col = start[0] + 1  # skip the index column
+    while ws.cell(3, col).value is not None:
+        table[ws.cell(3, col).value] = [ws.cell(r, col).value for r in range(4, ws.max_row + 1)]
+        col += 1
+    return table
+
+
+def test_real_area_fractions_sum_to_one():
+    from Fossagrim.unit_tests.conftest import REAL_FORVALTNINGSPLAN
+
+    if not os.path.isfile(REAL_FORVALTNINGSPLAN):
+        pytest.skip('Real test data is not available')
+    fractions = independent_area_fractions()
+    assert all(fraction > 0 for fraction in fractions.values())
+    assert sum(fractions.values()) == pytest.approx(1.)
+
+
+@pytest.mark.parametrize('method', ['BAU', 'PRES'])
+def test_real_combined_results_are_area_weighted(real_rearranged_results, method):
+    from Fossagrim.unit_tests.conftest import REAL_HEUREKA_RESULTS, REAL_PROJECT_NAME
+
+    fractions = independent_area_fractions()
+    raw_workbook = openpyxl.load_workbook(REAL_HEUREKA_RESULTS)  # the original, untouched, results
+    raw = {forest_type: independent_raw_sheet(raw_workbook, '{} {} {}'.format(REAL_PROJECT_NAME, forest_type, method))
+           for forest_type in COMBINED_FOREST_TYPES}
+
+    combined_title = '{} Combined Stands {} {}'.format(REAL_PROJECT_NAME, '-and-'.join(COMBINED_FOREST_TYPES), method)
+    combined = rearranged_table(openpyxl.load_workbook(real_rearranged_results), combined_title)
+
+    # The combined table must contain the important carbon variables, so the test can not pass on an empty table
+    for variable in ['Total Carbon Stock (dead wood, soil, trees, stumps and roots)', 'Soil Carbon Stock',
+                     'Total Extracted Volume Fub (m³fub)', 'Year']:
+        assert variable in combined, '{} is missing in the combined results'.format(variable)
+
+    n_periods = len(raw['Spruce']['Year'])
+    assert all(len(values) == n_periods for values in combined.values())
+
+    # Year and Treatment are copied from the first forest type
+    assert [float(x) for x in combined['Year']] == [float(x) for x in raw['Spruce']['Year']]
+    assert [x if x not in [None, 'None'] else None for x in combined['Treatment']] == \
+        [x if x not in [None, 'None'] else None for x in raw['Spruce']['Treatment']]
+
+    for variable, values in combined.items():
+        if variable in COPIED_VARIABLES:
+            continue
+        expected = [sum(fractions[forest_type] * float(raw[forest_type][variable][period])
+                        for forest_type in COMBINED_FOREST_TYPES)
+                    for period in range(n_periods)]
+        assert [float(x) for x in values] == pytest.approx(expected, rel=1e-9), \
+            '{} {}: combined values differ from the area weighted sum of {}'.format(
+                method, variable, ', '.join(COMBINED_FOREST_TYPES))
